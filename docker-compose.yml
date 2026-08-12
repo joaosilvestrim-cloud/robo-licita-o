@@ -1,0 +1,128 @@
+services:
+  postgres:
+    image: postgres-16-alpine-patched
+    build:
+      context: /opt/dockerfiles/postgres-alpine
+      dockerfile: Dockerfile
+    container_name: procurement-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: acraprocurement
+      POSTGRES_USER: procurement
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-procurement-secret-2024}
+      TZ: America/Sao_Paulo
+    volumes:
+    - procurement_postgres:/var/lib/postgresql/data
+    networks:
+    - procurement_net
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U procurement -d acraprocurement
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: procurement-backend
+    restart: unless-stopped
+    env_file:
+    - .env
+    environment:
+    - DATABASE_URL=postgresql+asyncpg://procurement:${POSTGRES_PASSWORD:-procurement-secret-2024}@postgres:5432/acraprocurement
+    - HERMES_URL=http://hermes:4000
+    - TZ=America/Sao_Paulo
+    networks:
+    - procurement_net
+    - acra_shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8003/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        BACKEND_URL: ''
+    container_name: procurement-frontend
+    restart: unless-stopped
+    networks:
+    - procurement_net
+    read_only: true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=50m
+    - /app/.next/cache:rw,nosuid,size=200m
+    cap_drop:
+    - ALL
+    security_opt:
+    - no-new-privileges:true
+    environment:
+      TZ: America/Sao_Paulo
+  nginx:
+    image: nginx:alpine
+    container_name: procurement-nginx
+    restart: unless-stopped
+    volumes:
+    - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+    - procurement_net
+    - proxy
+    depends_on:
+    - frontend
+    - backend
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=proxy
+    - traefik.http.routers.procurement.entrypoints=https
+    - traefik.http.routers.procurement.rule=Host(`licita.nanuck.com.br`)
+    - traefik.http.routers.procurement.tls=true
+    - traefik.http.routers.procurement.tls.certresolver=cloudflare
+    - traefik.http.services.procurement.loadbalancer.server.port=80
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q --spider http://127.0.0.1/ || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    environment:
+      TZ: America/Sao_Paulo
+  hermes-procurement:
+    build:
+      context: ./hermes-procurement
+      dockerfile: Dockerfile
+    container_name: hermes-procurement
+    restart: unless-stopped
+    env_file:
+    - .env
+    environment:
+    - PROCUREMENT_API_URL=http://backend:8003
+    - HERMES_URL=http://hermes:4000
+    - TZ=America/Sao_Paulo
+    networks:
+    - procurement_net
+    - acra_shared
+    depends_on:
+      backend:
+        condition: service_healthy
+volumes:
+  procurement_postgres: null
+networks:
+  procurement_net:
+    driver: bridge
+  acra_shared:
+    external: true
+  proxy:
+    external: true

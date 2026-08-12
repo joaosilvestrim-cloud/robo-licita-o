@@ -1,0 +1,329 @@
+from datetime import date, timedelta
+from typing import Optional, List
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlmodel import select, func, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_session
+from app.db.models import PublicBid, BidStatus, BidSphere, BidModality, ObjectType, User
+from app.auth import get_current_user
+
+router = APIRouter(prefix="/api/bids", tags=["bids"])
+
+
+@router.get("/geo/cities")
+async def city_geo_stats(
+    state: str = Query(..., min_length=2, max_length=2, description="Sigla do estado (SP, RJ…)"),
+    status: Optional[BidStatus] = Query(BidStatus.aberta),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Agrega licitações por cidade com coordenadas (centroide do município via IBGE)."""
+    from app.services.geo_cache import get_state_centroids
+
+    result = await session.execute(
+        select(PublicBid).where(
+            PublicBid.state.ilike(state.strip()),
+            *([] if not status else [PublicBid.status == status]),
+        )
+    )
+    bids = result.scalars().all()
+
+    city_stats: dict[str, dict] = {}
+    for b in bids:
+        code = (b.city_code or "").strip()
+        if not code:
+            continue
+        if code not in city_stats:
+            city_stats[code] = {"city": b.city or "", "count": 0, "total_value": 0.0}
+        city_stats[code]["count"] += 1
+        city_stats[code]["total_value"] += float(b.estimated_value or 0)
+
+    if not city_stats:
+        return {"state": state.upper(), "cities": []}
+
+    centroids = await get_state_centroids(state)
+    by_code = {c["ibge_code"]: c for c in centroids}
+
+    cities = []
+    for code, stats in city_stats.items():
+        # tenta match direto (7 dígitos) e pelo prefixo de 6 dígitos
+        pt = by_code.get(code) or by_code.get(code[:6])
+        if not pt:
+            continue
+        cities.append({
+            "city_code": code,
+            "city":       stats["city"],
+            "lat":        pt["lat"],
+            "lng":        pt["lng"],
+            "count":      stats["count"],
+            "total_value": round(stats["total_value"], 2),
+        })
+
+    cities.sort(key=lambda x: x["count"], reverse=True)
+    return {"state": state.upper(), "cities": cities}
+
+
+@router.get("/geo")
+async def bid_geo_stats(
+    status: Optional[BidStatus] = Query(BidStatus.aberta),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Agrega licitações por estado para o mapa de calor."""
+    stmt = select(PublicBid)
+    if status:
+        stmt = stmt.where(PublicBid.status == status)
+
+    result = await session.execute(stmt)
+    bids = result.scalars().all()
+
+    state_stats: dict = {}
+    for b in bids:
+        key = (b.state or "").strip().upper()
+        if not key or len(key) != 2:
+            continue
+        if key not in state_stats:
+            state_stats[key] = {"count": 0, "total_value": 0.0}
+        state_stats[key]["count"] += 1
+        state_stats[key]["total_value"] += float(b.estimated_value or 0)
+
+    return {
+        "states": [
+            {"state": k, "count": v["count"], "total_value": round(v["total_value"], 2)}
+            for k, v in sorted(state_stats.items(), key=lambda x: x[1]["count"], reverse=True)
+        ]
+    }
+
+
+def _apply_filters(stmt, sphere, state, city, branch, status, modality,
+                   min_value, max_value, days_before_closing, q,
+                   only_open_for_proposals: bool = False,
+                   object_type: Optional[ObjectType] = None):
+    if sphere:
+        stmt = stmt.where(PublicBid.sphere == sphere)
+    if state:
+        stmt = stmt.where(PublicBid.state.ilike(state))
+    if city:
+        stmt = stmt.where(PublicBid.city.ilike(f"%{city}%"))
+    if branch:
+        stmt = stmt.where(
+            or_(
+                PublicBid.branch_name.ilike(f"%{branch}%"),
+                PublicBid.branch_code.ilike(f"%{branch}%"),
+            )
+        )
+    if status:
+        stmt = stmt.where(PublicBid.status == status)
+    if modality:
+        stmt = stmt.where(PublicBid.modality == modality)
+    if min_value is not None:
+        stmt = stmt.where(PublicBid.estimated_value >= min_value)
+    if max_value is not None:
+        stmt = stmt.where(PublicBid.estimated_value <= max_value)
+    if days_before_closing is not None:
+        deadline = date.today() + timedelta(days=days_before_closing)
+        stmt = stmt.where(
+            PublicBid.closing_date != None,  # noqa: E711
+            PublicBid.closing_date <= deadline,
+            PublicBid.closing_date >= date.today(),
+        )
+    if only_open_for_proposals:
+        # Apenas licitações em que ainda é possível enviar proposta:
+        # - status = aberta
+        # - closing_date ainda no futuro OU sem data definida (dispensa/inexig.)
+        stmt = stmt.where(
+            PublicBid.status == BidStatus.aberta,
+            or_(
+                PublicBid.closing_date == None,  # noqa: E711
+                PublicBid.closing_date >= date.today(),
+            ),
+        )
+    if object_type:
+        stmt = stmt.where(PublicBid.object_type == object_type)
+    if q:
+        term = f"%{q}%"
+        stmt = stmt.where(
+            or_(
+                PublicBid.title.ilike(term),
+                PublicBid.description.ilike(term),
+                PublicBid.organ_name.ilike(term),
+            )
+        )
+    return stmt
+
+
+@router.get("")
+async def list_bids(
+    sphere: Optional[BidSphere] = None,
+    state: Optional[str] = None,
+    city: Optional[str] = None,
+    branch: Optional[str] = None,
+    status: Optional[BidStatus] = None,
+    modality: Optional[BidModality] = None,
+    min_value: Optional[float] = None,
+    max_value: Optional[float] = None,
+    days_before_closing: Optional[int] = None,
+    only_open_for_proposals: bool = Query(False, description="Só licitações com prazo ainda aberto"),
+    object_type: Optional[ObjectType] = Query(None, description="Tipo do objeto: bem, servico, obra, consultoria, misto"),
+    q: Optional[str] = None,
+    sort_by: str = Query("closing_date", regex="^(closing_date|estimated_value|publication_date|opening_date|title|state|status)$"),
+    sort_dir: str = Query("asc", regex="^(asc|desc)$"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    stmt = select(PublicBid)
+    stmt = _apply_filters(stmt, sphere, state, city, branch, status, modality,
+                          min_value, max_value, days_before_closing, q,
+                          only_open_for_proposals, object_type)
+
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await session.execute(count_stmt)).scalar_one()
+
+    sort_col = getattr(PublicBid, sort_by, PublicBid.closing_date)
+    order = sort_col.desc().nullslast() if sort_dir == "desc" else sort_col.asc().nullslast()
+    stmt = stmt.order_by(order).offset((page - 1) * limit).limit(limit)
+    result = await session.execute(stmt)
+    bids = result.scalars().all()
+
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit,
+        "data": [_bid_summary(b) for b in bids],
+    }
+
+
+@router.get("/search")
+async def search_bids(
+    q: str = Query(..., min_length=2),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    term = f"%{q}%"
+    stmt = select(PublicBid).where(
+        or_(
+            PublicBid.title.ilike(term),
+            PublicBid.description.ilike(term),
+            PublicBid.organ_name.ilike(term),
+            PublicBid.category_name.ilike(term),
+        )
+    )
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await session.execute(count_stmt)).scalar_one()
+    stmt = stmt.offset((page - 1) * limit).limit(limit)
+    result = await session.execute(stmt)
+    bids = result.scalars().all()
+
+    return {
+        "total": total,
+        "page": page,
+        "data": [_bid_summary(b) for b in bids],
+    }
+
+
+@router.get("/stats")
+async def bid_stats(
+    sphere: Optional[BidSphere] = None,
+    state: Optional[str] = None,
+    status: Optional[BidStatus] = Query(BidStatus.aberta),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    stmt = select(PublicBid)
+    stmt = _apply_filters(stmt, sphere, state, None, None, status, None, None, None, None, None)
+
+    result = await session.execute(stmt)
+    bids = result.scalars().all()
+
+    total_value = sum((b.estimated_value or 0) for b in bids)
+    count = len(bids)
+
+    # Top ramos
+    branch_counts: dict = {}
+    for b in bids:
+        key = b.branch_name or "Outros"
+        branch_counts[key] = branch_counts.get(key, {"count": 0, "value": 0})
+        branch_counts[key]["count"] += 1
+        branch_counts[key]["value"] += float(b.estimated_value or 0)
+
+    top_branches = sorted(branch_counts.items(), key=lambda x: x[1]["count"], reverse=True)[:5]
+
+    # Distribuição por esfera
+    sphere_dist = {}
+    for b in bids:
+        key = b.sphere.value if b.sphere else "outros"
+        sphere_dist[key] = sphere_dist.get(key, 0) + 1
+
+    # Próximas (7 dias)
+    next_7d = date.today() + timedelta(days=7)
+    coming = [b for b in bids if b.closing_date and b.closing_date <= next_7d]
+
+    return {
+        "total_bids": count,
+        "total_estimated_value": float(total_value),
+        "average_value": float(total_value / count) if count else 0,
+        "total_coming_7d": len(coming),
+        "spheres_distribution": sphere_dist,
+        "branches_top_5": [
+            {"branch": k, "count": v["count"], "value": v["value"]}
+            for k, v in top_branches
+        ],
+    }
+
+
+@router.get("/{bid_id}")
+async def get_bid(bid_id: int, session: AsyncSession = Depends(get_session), _: User = Depends(get_current_user)):
+    bid = await session.get(PublicBid, bid_id)
+    if not bid:
+        raise HTTPException(404, "Licitação não encontrada")
+    return _bid_detail(bid)
+
+
+def _bid_summary(b: PublicBid) -> dict:
+    return {
+        "id": b.id,
+        "title": b.title,
+        "sphere": b.sphere,
+        "state": b.state,
+        "city": b.city,
+        "organ_name": b.organ_name,
+        "status": b.status,
+        "modality": b.modality,
+        "object_type": b.object_type,
+        "branch_name": b.branch_name,
+        "estimated_value": float(b.estimated_value) if b.estimated_value else None,
+        "publication_date": b.publication_date,
+        "opening_date": b.opening_date,
+        "closing_date": b.closing_date,
+        "source": b.source,
+    }
+
+
+def _bid_detail(b: PublicBid) -> dict:
+    return {
+        **_bid_summary(b),
+        "description": b.description,
+        "category_code": b.category_code,
+        "category_name": b.category_name,
+        "organ_cnpj": b.organ_cnpj,
+        "city_code": b.city_code,
+        "maximum_value": float(b.maximum_value) if b.maximum_value else None,
+        "min_patrimony": float(b.min_patrimony) if b.min_patrimony else None,
+        "min_revenue": float(b.min_revenue) if b.min_revenue else None,
+        "years_of_operation": b.years_of_operation,
+        "requires_sme": b.requires_sme,
+        "requires_mei": b.requires_mei,
+        "contact_name": b.contact_name,
+        "contact_email": b.contact_email,
+        "contact_phone": b.contact_phone,
+        "edital_url": b.edital_url,
+        "details_url": b.details_url,
+        "platform_url": b.platform_url,
+        "last_scraped": b.last_scraped,
+        "updated_at": b.updated_at,
+    }
