@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { FileSearch, Bell, BookmarkCheck, TrendingUp, AlertCircle, RefreshCw, Search } from "lucide-react";
+import { FileSearch, Bell, BookmarkCheck, TrendingUp, AlertCircle, RefreshCw, Search, Cpu } from "lucide-react";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -17,6 +17,8 @@ function useAuth() {
 export default function DashboardPage() {
   const token = useAuth();
   const [data, setData]     = useState<any>(null);
+  const [tiBids, setTiBids] = useState<any[]>([]);
+  const [tiTotal, setTiTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing]   = useState(false);
   const [kwInput, setKwInput]   = useState("");
@@ -24,11 +26,16 @@ export default function DashboardPage() {
   const [kwMsg, setKwMsg]       = useState("");
 
   async function load() {
+    const headers = { Authorization: `Bearer ${token}` };
     try {
-      const res = await fetch(`${API}/api/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setData(await res.json());
+      const [dRes, tiRes] = await Promise.all([
+        fetch(`${API}/api/dashboard`, { headers }),
+        fetch(`${API}/api/bids/ti?limit=5`, { headers }),
+      ]);
+      setData(await dRes.json());
+      const ti = await tiRes.json().catch(() => ({}));
+      setTiBids(ti.data ?? []);
+      setTiTotal(ti.total ?? 0);
     } catch {}
     setLoading(false);
   }
@@ -122,7 +129,7 @@ export default function DashboardPage() {
               type="text"
               value={kwInput}
               onChange={e => setKwInput(e.target.value)}
-              placeholder='Ex: "Google Ads", "tráfego pago", "Meta Ads", "software de gestão"…'
+              placeholder='Ex: "Power BI", "análise de dados", "dashboard", "business intelligence"…'
               className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-proc-400"
             />
           </div>
@@ -157,30 +164,44 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Top ramos */}
+        {/* Oportunidades de TI & Dados (foco Drive Data) */}
         <div className="bg-white rounded-2xl shadow-card border border-slate-100 p-6">
-          <h2 className="font-semibold text-slate-900 mb-4">Ramos com mais oportunidades</h2>
-          {(data?.branches_top_5 ?? []).length === 0 ? (
-            <p className="text-slate-400 text-sm text-center py-8">Nenhum dado disponível. Sincronize primeiro.</p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Cpu size={17} className="text-proc-500" />
+              <h2 className="font-semibold text-slate-900">Oportunidades de TI &amp; Dados</h2>
+            </div>
+            {tiTotal > 0 && (
+              <span className="text-[11px] font-semibold text-white dd-gradient px-2.5 py-1 rounded-full">{tiTotal} abertas</span>
+            )}
+          </div>
+          {tiBids.length === 0 ? (
+            <p className="text-slate-400 text-sm text-center py-8">Nenhuma no momento.</p>
           ) : (
-            <div className="space-y-3">
-              {data.branches_top_5.map((b: any, i: number) => {
-                const maxCount = data.branches_top_5[0]?.count || 1;
-                const pct = Math.round((b.count / maxCount) * 100);
-                return (
-                  <div key={b.branch}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-slate-700">{b.branch}</span>
-                      <span className="text-xs text-slate-500">{b.count} licitações · {fmt(b.value)}</span>
-                    </div>
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-proc-500 rounded-full" style={{ width: `${pct}%` }} />
+            <div className="space-y-0.5">
+              {tiBids.map((b: any) => (
+                <Link key={b.id} href={`/dashboard/bids/${b.id}`}
+                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition group">
+                  <div className="w-9 h-9 rounded-lg bg-proc-50 flex items-center justify-center shrink-0 text-proc-600 font-bold text-[11px]">
+                    {b.state ?? "—"}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm text-slate-700 truncate group-hover:text-proc-700">{b.title}</div>
+                    <div className="text-[11px] text-slate-400 truncate">
+                      {b.organ_name ?? "—"} · {b.estimated_value ? fmt(b.estimated_value) : "valor n/d"}
                     </div>
                   </div>
-                );
-              })}
+                  {typeof b.relevance === "number" && (
+                    <span className="text-[10px] font-mono text-proc-500 shrink-0" title="relevância">rel {b.relevance}</span>
+                  )}
+                </Link>
+              ))}
             </div>
           )}
+          <Link href="/dashboard/bids"
+            className="block text-center text-sm text-proc-600 hover:text-proc-700 font-medium mt-3 pt-3 border-t border-slate-50">
+            Ver todas as licitações →
+          </Link>
         </div>
 
         {/* Distribuição por esfera */}
