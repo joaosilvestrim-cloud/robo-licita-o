@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     # mesmo banco (ex.: o demo do CRM). "public" = comportamento padrão.
     db_schema: str = "public"
 
+    # IA — Assistente Sonar via Groq (API compatível com OpenAI).
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    # Porta interna (Render injeta PORT) — usada pelo agente p/ chamar a própria API.
+    port: int = 8003
+
     class Config:
         env_file = ".env"
         extra = "ignore"

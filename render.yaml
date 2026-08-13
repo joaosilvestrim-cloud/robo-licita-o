@@ -31,6 +31,9 @@ services:
       # Origens liberadas no CORS. Coloque a URL do front na Vercel.
       - key: CORS_ORIGINS
         sync: false
+      # Chave do Groq para o Assistente Sonar (IA). Crie em console.groq.com.
+      - key: GROQ_API_KEY
+        sync: false
       # Opcionais (SSO / e-mail). Deixe em branco se nao usar por enquanto.
       - key: SSO_KEY
         value: acra-sso-2024

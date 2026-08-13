@@ -4,12 +4,11 @@ from typing import List, Optional
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
-import httpx
 
 from app.database import get_session
 from app.db.models import ChatMessage, User
-from app.auth import get_current_user
-from app.config import settings
+from app.auth import get_current_user, oauth2_scheme
+from app.services.hermes import run_agent
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -28,6 +27,7 @@ async def chat(
     body: ChatRequest,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
+    token: str = Depends(oauth2_scheme),
 ):
     # Save user message
     user_msg = ChatMessage(
@@ -39,18 +39,8 @@ async def chat(
     session.add(user_msg)
     await session.flush()
 
-    # Call hermes-procurement
-    try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                f"{settings.hermes_procurement_url}/chat",
-                json={"message": body.message, "tenant_id": user.tenant_id},
-            )
-            resp.raise_for_status()
-            result = resp.json()
-            content = result.get("response", "Não consegui processar sua mensagem.")
-    except Exception as e:
-        content = "Estou com dificuldades técnicas no momento. Tente novamente em instantes."
+    # Agente Sonar (Groq) rodando no próprio backend, com o JWT do usuário
+    content = await run_agent(body.message, user_token=token)
 
     # Save assistant message
     asst_msg = ChatMessage(
