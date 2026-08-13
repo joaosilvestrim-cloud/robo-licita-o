@@ -422,10 +422,17 @@ async def bid_eligibility(
     bid_value = float(bid.estimated_value or 0)
     bid_sphere = bid.sphere.value if bid.sphere else None
 
+    def _kw_hit(k):
+        fk = _fold_py(k)
+        if not fk:
+            return False
+        # casa por palavra inteira (evita "ti" achar "participacao")
+        return _re.search(r"(?<!\w)" + _re.escape(fk) + r"(?!\w)", bid_text) is not None
+
     def evaluate(kw_list, states, spheres, vmin, vmax):
         checks = []
-        # 1) palavras-chave
-        hits = [k for k in kw_list if _fold_py(k) and _fold_py(k) in bid_text]
+        # 1) palavras-chave (match por palavra inteira)
+        hits = [k for k in kw_list if _kw_hit(k)]
         if kw_list:
             if hits:
                 checks.append({"key": "keywords", "status": "ok",
