@@ -92,6 +92,7 @@ export default function BidDetailPage() {
   const [files,   setFiles]   = useState<any[]>([]);   // documentos
   const [loading, setLoading] = useState(true);
   const [tracking, setTracking] = useState(false);
+  const [elig, setElig] = useState<any>(null);   // análise de aderência (Candidatura Assistida)
 
   // 1) busca o bid do nosso DB
   useEffect(() => {
@@ -127,6 +128,15 @@ export default function BidDetailPage() {
       .then(d => { if (Array.isArray(d)) setFiles(d); })
       .catch(() => {});
   }, [bid?.external_id]);
+
+  // análise de aderência do perfil (Candidatura Assistida — Fase A)
+  useEffect(() => {
+    if (!bid?.id || !token) return;
+    fetch(`${API}/api/bids/${bid.id}/eligibility`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setElig(d))
+      .catch(() => {});
+  }, [bid?.id, token]);
 
   async function startTracking() {
     setTracking(true);
@@ -253,6 +263,60 @@ export default function BidDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Análise de aderência — Candidatura Assistida (Fase A) */}
+        {elig && (() => {
+          const V: Record<string, { label: string; cls: string; bar: string; Icon: any }> = {
+            elegivel: { label: "Elegível — prepare a candidatura", cls: "text-emerald-700 bg-emerald-50 border-emerald-200", bar: "bg-emerald-500", Icon: CheckCircle },
+            revisar:  { label: "Revisar — ajuste algum ponto",     cls: "text-amber-700 bg-amber-50 border-amber-200",       bar: "bg-amber-500",   Icon: AlertCircle },
+            fora:     { label: "Fora do seu perfil",               cls: "text-slate-600 bg-slate-100 border-slate-200",      bar: "bg-slate-400",   Icon: XCircle },
+          };
+          const v = V[elig.verdict] ?? V.revisar;
+          const VIcon = v.Icon;
+          const cIcon = (s: string) => s === "ok"
+            ? <CheckCircle size={15} className="text-emerald-500 shrink-0" />
+            : s === "warn"
+            ? <AlertCircle size={15} className="text-amber-500 shrink-0" />
+            : <XCircle size={15} className="text-red-400 shrink-0" />;
+          return (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+              <div className="dd-gradient px-6 py-3 flex items-center gap-2 text-white">
+                <Package size={16} />
+                <span className="text-sm font-semibold">Análise de aderência</span>
+                <span className="text-[11px] text-white/70 ml-1">Candidatura Assistida</span>
+                {elig.matched_profile && (
+                  <span className="text-[11px] bg-white/15 rounded-full px-2 py-0.5 ml-auto">perfil: {elig.matched_profile}</span>
+                )}
+              </div>
+              <div className="p-6">
+                <div className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-sm font-semibold border ${v.cls}`}>
+                  <VIcon size={15} /> {v.label}
+                </div>
+                <div className="mt-4 grid sm:grid-cols-2 gap-x-6 gap-y-2.5">
+                  {(elig.checks ?? []).map((c: any, i: number) => (
+                    <div key={i} className="flex items-start gap-2.5 text-sm">
+                      {cIcon(c.status)}
+                      <div>
+                        <span className="text-slate-700 font-medium">{c.label}</span>
+                        <span className="text-slate-400"> · {c.detail}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {elig.hint && <p className="text-xs text-slate-400 mt-4">{elig.hint}</p>}
+                <div className="flex items-center gap-3 mt-5 pt-4 border-t border-slate-100">
+                  <button
+                    disabled
+                    title="Geração de proposta e documentos — em breve (Fase B)"
+                    className="flex items-center gap-2 text-white px-4 py-2 rounded-xl text-sm font-semibold dd-gradient opacity-60 cursor-not-allowed">
+                    <FileText size={15} /> Preparar candidatura
+                  </button>
+                  <span className="text-xs text-slate-400">Geração de proposta e documentos chega na Fase B.</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="grid md:grid-cols-2 gap-5">
           {/* Datas */}

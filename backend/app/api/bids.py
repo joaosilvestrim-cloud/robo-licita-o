@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlmodel import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
-from app.db.models import PublicBid, BidStatus, BidSphere, BidModality, ObjectType, User
+from app.db.models import PublicBid, BidStatus, BidSphere, BidModality, ObjectType, User, ProcurementProfile, Tenant
 from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/bids", tags=["bids"])
@@ -390,6 +390,126 @@ async def get_bid(bid_id: int, session: AsyncSession = Depends(get_session), _: 
     if not bid:
         raise HTTPException(404, "Licitação não encontrada")
     return _bid_detail(bid)
+
+
+def _split_csv(s):
+    return [p.strip() for p in (s or "").split(",") if p.strip()]
+
+
+@router.get("/{bid_id}/eligibility")
+async def bid_eligibility(
+    bid_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Candidatura Assistida — Fase A: analisa a aderência da licitação ao perfil
+    da empresa e devolve um veredito (elegivel / revisar / fora) com checagens.
+    """
+    bid = await session.get(PublicBid, bid_id)
+    if not bid:
+        raise HTTPException(404, "Licitação não encontrada")
+
+    tenant = await session.get(Tenant, user.tenant_id)
+    profiles = (await session.execute(
+        select(ProcurementProfile).where(
+            ProcurementProfile.tenant_id == user.tenant_id,
+            ProcurementProfile.active == True,  # noqa: E712
+        )
+    )).scalars().all()
+
+    bid_text = _fold_py(f"{bid.title or ''} {bid.description or ''} {bid.category_name or ''} {bid.branch_name or ''}")
+    bid_state = (bid.state or "").upper()
+    bid_value = float(bid.estimated_value or 0)
+    bid_sphere = bid.sphere.value if bid.sphere else None
+
+    def evaluate(kw_list, states, spheres, vmin, vmax):
+        checks = []
+        # 1) palavras-chave
+        hits = [k for k in kw_list if _fold_py(k) and _fold_py(k) in bid_text]
+        if kw_list:
+            if hits:
+                checks.append({"key": "keywords", "status": "ok",
+                               "label": "Palavras-chave do perfil",
+                               "detail": "bateu: " + ", ".join(hits[:4])})
+            else:
+                checks.append({"key": "keywords", "status": "fail",
+                               "label": "Palavras-chave do perfil",
+                               "detail": "nenhuma palavra do perfil no objeto"})
+        # 2) estado
+        if states:
+            if bid_state in [s.upper() for s in states]:
+                checks.append({"key": "state", "status": "ok", "label": "Estado de atuação",
+                               "detail": f"{bid_state} está nos seus estados"})
+            else:
+                checks.append({"key": "state", "status": "warn", "label": "Estado de atuação",
+                               "detail": f"{bid_state or '—'} fora dos seus estados"})
+        # 3) faixa de valor
+        if vmin is not None or vmax is not None:
+            below = vmin is not None and bid_value and bid_value < float(vmin)
+            above = vmax is not None and bid_value and bid_value > float(vmax)
+            if not (below or above):
+                checks.append({"key": "value", "status": "ok", "label": "Faixa de valor",
+                               "detail": "valor dentro da sua faixa"})
+            else:
+                checks.append({"key": "value", "status": "warn", "label": "Faixa de valor",
+                               "detail": "valor fora da faixa do perfil"})
+        # 4) esfera
+        if spheres and bid_sphere:
+            if bid_sphere in [s.strip() for s in spheres]:
+                checks.append({"key": "sphere", "status": "ok", "label": "Esfera",
+                               "detail": bid_sphere})
+            else:
+                checks.append({"key": "sphere", "status": "warn", "label": "Esfera",
+                               "detail": f"{bid_sphere} fora das preferidas"})
+        return checks, len(hits)
+
+    best = None
+    for p in profiles:
+        kw = _split_csv(p.keywords) + _split_csv(p.preferred_branches)
+        checks, hitn = evaluate(
+            kw, _split_csv(p.preferred_states), _split_csv(p.preferred_spheres),
+            p.min_estimated_value, p.max_estimated_value,
+        )
+        # pontuação: keyword hits pesam mais; cada warn tira ponto
+        score = hitn * 30
+        score -= sum(8 for c in checks if c["status"] == "warn")
+        score -= sum(40 for c in checks if c["status"] == "fail")
+        if best is None or score > best["score"]:
+            best = {"profile": p.name, "score": score, "checks": checks, "hits": hitn}
+
+    # Sem perfis: cai pra aderência de TI (foco Drive Data)
+    if best is None:
+        s, w = _it_counts(bid)
+        if s >= 1:
+            return {
+                "bid_id": bid_id, "verdict": "revisar", "score": 50, "matched_profile": None,
+                "checks": [{"key": "ti", "status": "ok", "label": "Aderência a TI & Dados",
+                            "detail": "forte sinal de TI no objeto"}],
+                "hint": "Crie um perfil de monitoramento para uma análise sob medida.",
+            }
+        return {
+            "bid_id": bid_id, "verdict": "revisar", "score": 0, "matched_profile": None,
+            "checks": [{"key": "profile", "status": "warn", "label": "Sem perfil configurado",
+                        "detail": "crie um perfil para o Sonar avaliar a aderência"}],
+            "hint": "Crie um perfil em Meus Perfis para ativar a análise de aderência.",
+        }
+
+    has_fail = any(c["status"] == "fail" for c in best["checks"])
+    has_warn = any(c["status"] == "warn" for c in best["checks"])
+    if best["hits"] >= 1 and not has_warn:
+        verdict = "elegivel"
+    elif best["hits"] >= 1:
+        verdict = "revisar"
+    else:
+        verdict = "fora" if has_fail else "revisar"
+
+    return {
+        "bid_id": bid_id,
+        "verdict": verdict,
+        "score": max(0, min(100, best["score"])),
+        "matched_profile": best["profile"],
+        "checks": best["checks"],
+    }
 
 
 def _bid_summary(b: PublicBid) -> dict:
