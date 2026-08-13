@@ -32,6 +32,9 @@ class Settings(BaseSettings):
 
     # Origens permitidas no CORS. "*" libera geral. Em prod, use a URL do front.
     cors_origins: str = "*"
+    # Regex de origens liberadas (além da lista). Cobre qualquer subdomínio de
+    # drivedata.com.br e qualquer deploy .vercel.app — evita reconfigurar CORS.
+    cors_origin_regex: str = r"https://([a-z0-9-]+\.)*(drivedata\.com\.br|vercel\.app)$"
 
     # Schema do Postgres onde ficam as tabelas do robô. Isola de outros apps no
     # mesmo banco (ex.: o demo do CRM). "public" = comportamento padrão.
