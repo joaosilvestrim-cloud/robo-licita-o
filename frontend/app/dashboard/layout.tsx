@@ -125,8 +125,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="ml-60 flex-1 h-screen overflow-hidden">
+      {/* Main — rola por padrão; páginas com layout próprio (bids/detalhe) usam h-screen internamente */}
+      <main className="ml-60 flex-1 h-screen overflow-y-auto">
         {children}
       </main>
 
