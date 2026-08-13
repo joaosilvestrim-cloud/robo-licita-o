@@ -9,6 +9,21 @@ from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/bids", tags=["bids"])
 
+# ── Busca insensível a acento (sem depender de extensão no banco) ──────────────
+import unicodedata
+_ACCENTS_FROM = "áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ"
+_ACCENTS_TO   = "aaaaaeeeeiiiiooooouuuucaaaaaeeeeiiiiooooouuuuc"
+
+
+def _fold_py(s: str) -> str:
+    """Remove acentos e baixa a caixa (lado do termo buscado)."""
+    return "".join(c for c in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(c)).lower()
+
+
+def _fold_col(col):
+    """Dobra acentos e baixa a caixa da coluna, no SQL."""
+    return func.translate(func.lower(col), _ACCENTS_FROM, _ACCENTS_TO)
+
 
 @router.get("/geo/cities")
 async def city_geo_stats(
@@ -141,12 +156,12 @@ def _apply_filters(stmt, sphere, state, city, branch, status, modality,
     if object_type:
         stmt = stmt.where(PublicBid.object_type == object_type)
     if q:
-        term = f"%{q}%"
+        term = f"%{_fold_py(q)}%"
         stmt = stmt.where(
             or_(
-                PublicBid.title.ilike(term),
-                PublicBid.description.ilike(term),
-                PublicBid.organ_name.ilike(term),
+                _fold_col(PublicBid.title).like(term),
+                _fold_col(PublicBid.description).like(term),
+                _fold_col(PublicBid.organ_name).like(term),
             )
         )
     return stmt
@@ -204,13 +219,13 @@ async def search_bids(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
-    term = f"%{q}%"
+    term = f"%{_fold_py(q)}%"
     stmt = select(PublicBid).where(
         or_(
-            PublicBid.title.ilike(term),
-            PublicBid.description.ilike(term),
-            PublicBid.organ_name.ilike(term),
-            PublicBid.category_name.ilike(term),
+            _fold_col(PublicBid.title).like(term),
+            _fold_col(PublicBid.description).like(term),
+            _fold_col(PublicBid.organ_name).like(term),
+            _fold_col(PublicBid.category_name).like(term),
         )
     )
     count_stmt = select(func.count()).select_from(stmt.subquery())
