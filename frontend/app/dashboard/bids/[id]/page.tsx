@@ -54,7 +54,8 @@ function parseExternalId(externalId: string | null | undefined) {
 
 function pncpPortalUrl(parsed: ReturnType<typeof parseExternalId>) {
   if (!parsed) return null;
-  return `https://pncp.gov.br/app/editais/${parsed.cnpj}/${parsed.tipo}/${parsed.ano}/${parsed.seq}`;
+  // Formato correto do PNCP: /editais/{cnpj}/{ano}/{sequencial} (sem o "tipo")
+  return `https://pncp.gov.br/app/editais/${parsed.cnpj}/${parsed.ano}/${parsed.seq}`;
 }
 
 // ─── componentes auxiliares ──────────────────────────────────────────────────
