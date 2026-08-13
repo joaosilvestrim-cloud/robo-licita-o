@@ -76,6 +76,7 @@ export default function LoginPage() {
       localStorage.setItem("proc_user_name",   d.user_name);
       localStorage.setItem("proc_tenant_id",   String(d.tenant_id));
       localStorage.setItem("proc_tenant_name", d.tenant_name);
+      localStorage.setItem("proc_user_role",   d.user_role ?? "simple");
       router.push("/dashboard");
     } catch { setError("Erro de conexão."); }
     finally { setLoading(false); }
@@ -133,6 +134,7 @@ export default function LoginPage() {
       localStorage.setItem("proc_user_name",   d.user_name);
       localStorage.setItem("proc_tenant_id",   String(d.tenant_id));
       localStorage.setItem("proc_tenant_name", d.tenant_name);
+      localStorage.setItem("proc_user_role",   d.user_role ?? "simple");
       router.push("/dashboard");
     } catch { setError("Erro de conexão."); }
     finally { setLoading(false); }

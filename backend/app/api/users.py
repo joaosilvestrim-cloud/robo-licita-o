@@ -69,6 +69,7 @@ class UpdateRoleBody(BaseModel):
     role: Optional[UserRole] = None
     active: Optional[bool] = None
     name: Optional[str] = None
+    password: Optional[str] = None  # admin redefine a senha do usuário
 
 
 @router.patch("/{user_id}")
@@ -78,7 +79,7 @@ async def update_user(
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin),
 ):
-    """Atualiza role/status de um usuário da empresa (Admin)."""
+    """Atualiza perfil/status/nome/senha de um usuário da empresa (Admin)."""
     target = await session.get(User, user_id)
     if not target or target.tenant_id != admin.tenant_id:
         raise HTTPException(404, "Usuário não encontrado")
@@ -91,6 +92,10 @@ async def update_user(
         target.active = body.active
     if body.name is not None:
         target.name = body.name
+    if body.password:
+        if len(body.password) < 6:
+            raise HTTPException(400, "A senha deve ter pelo menos 6 caracteres")
+        target.hashed_password = hash_password(body.password)
 
     await session.commit()
     await session.refresh(target)

@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, FileSearch, Bell, BookmarkCheck,
-  LogOut, ChevronRight, BarChart2, Target, Building2, Database,
+  LogOut, ChevronRight, BarChart2, Target, Building2, Database, Users,
 } from "lucide-react";
 import ChatWidget from "../components/ChatWidget";
 import { Logo } from "../components/Logo";
@@ -25,6 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [userName, setUserName]       = useState("Usuário");
   const [tenantName, setTenantName]   = useState("");
+  const [role, setRole]               = useState("");
   const [newAlerts, setNewAlerts]     = useState(0);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!token) { router.replace("/login"); return; }
     setUserName(localStorage.getItem("proc_user_name") || "Usuário");
     setTenantName(localStorage.getItem("proc_tenant_name") || "");
+    setRole(localStorage.getItem("proc_user_role") || "");
 
     // Busca contagem de alertas novos
     const api = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -51,6 +53,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const initial = userName.charAt(0).toUpperCase();
+
+  // Área de Usuários só para o Admin da empresa
+  const navItems = role === "admin"
+    ? [...nav, { href: "/dashboard/users", label: "Usuários", icon: Users }]
+    : nav;
 
   function isActive(item: { href: string; exact?: boolean }) {
     return item.exact ? pathname === item.href : pathname.startsWith(item.href);
@@ -79,7 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {nav.map(item => {
+          {navItems.map(item => {
             const active = isActive(item);
             return (
               <Link key={item.href} href={item.href}
