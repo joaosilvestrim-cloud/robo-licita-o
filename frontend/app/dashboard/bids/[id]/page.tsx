@@ -169,7 +169,7 @@ export default function BidDetailPage() {
   const pubDate     = detail?.dataPublicacaoPncp       ? detail.dataPublicacaoPncp.split("T")[0] : bid.publication_date;
 
   return (
-    <div className="min-h-screen bg-slate-50 overflow-auto">
+    <div className="h-screen bg-slate-50 overflow-y-auto">
       {/* Topbar */}
       <div className="sticky top-0 z-30 bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
         <button onClick={() => router.back()}
