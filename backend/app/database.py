@@ -143,7 +143,11 @@ async def init_db():
             )
         """))
 
-        await conn.execute(text("""
+        # idempotente: municipal_portals nao tem unique, entao so popula se vazio
+        # (evita duplicar os 71 portais a cada restart do backend)
+        _mp_count = (await conn.execute(text("SELECT COUNT(*) FROM municipal_portals"))).scalar() or 0
+        if _mp_count == 0:
+            await conn.execute(text("""
             INSERT INTO municipal_portals (city, state, portal_name, portal_url, system_name, portal_type, scraper_key, active, verified, created_at, updated_at)
             VALUES
             -- ── PORTAIS ESTADUAIS ────────────────────────────────────────────
