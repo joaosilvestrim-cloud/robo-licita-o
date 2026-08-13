@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, FileSearch, Search, Loader2, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Eye, EyeOff, Search, Loader2, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Logo } from "../components/Logo";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 type Mode = "login" | "register";
@@ -142,12 +143,10 @@ export default function LoginPage() {
       {/* Left panel */}
       <div className="hidden lg:flex flex-col justify-between w-96 bg-proc-900 p-10 text-white">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-proc-500 flex items-center justify-center shadow">
-            <FileSearch size={18} />
-          </div>
+          <Logo size={38} />
           <div>
-            <div className="font-bold text-lg leading-tight">Licita</div>
-            <div className="text-xs text-white/40 leading-tight">by Acrasystem</div>
+            <div className="font-bold text-lg leading-tight">Drive Data</div>
+            <div className="text-xs text-white/40 leading-tight">Licitações</div>
           </div>
         </div>
         <div>
@@ -158,7 +157,7 @@ export default function LoginPage() {
             Acompanhe licitações federais, estaduais e municipais com alertas personalizados, mapa de calor e agente IA que encontra oportunidades para sua empresa.
           </p>
           <div className="space-y-2.5 text-sm text-white/70">
-            {["PNCP integrado — dados em tempo real", "Mapa de calor por estado e cidade", "Alertas por perfil + score de relevância", "Agente Hermes Licita para auxiliar sua busca"].map(f => (
+            {["PNCP integrado — dados em tempo real", "Mapa de calor por estado e cidade", "Alertas por perfil + score de relevância", "Assistente Drive Data para auxiliar sua busca"].map(f => (
               <div key={f} className="flex items-center gap-2.5">
                 <CheckCircle size={14} className="text-proc-300 shrink-0" />
                 {f}
@@ -166,7 +165,7 @@ export default function LoginPage() {
             ))}
           </div>
         </div>
-        <div className="text-xs text-white/20">© 2024 Acrasystem · licita.nanuck.com.br</div>
+        <div className="text-xs text-white/20">© 2026 Drive Data · drivedata.com.br</div>
       </div>
 
       {/* Right panel */}

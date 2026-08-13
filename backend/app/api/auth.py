@@ -228,7 +228,7 @@ class ResetRequest(BaseModel):
 def _send_reset_email(to_email: str, reset_link: str, user_name: str):
     body = f"""Olá, {user_name}!
 
-Recebemos uma solicitação para redefinir a senha da sua conta no Licita (licita.nanuck.com.br).
+Recebemos uma solicitação para redefinir a senha da sua conta no Drive Data Licitações.
 
 Clique no link abaixo para criar uma nova senha (válido por 30 minutos):
 
@@ -236,10 +236,10 @@ Clique no link abaixo para criar uma nova senha (válido por 30 minutos):
 
 Se você não solicitou a redefinição, ignore este e-mail.
 
-Equipe Licita · Acrasystem
+Equipe Drive Data
 """
     msg = MIMEText(body, "plain", "utf-8")
-    msg["Subject"] = "Redefinição de senha — Licita"
+    msg["Subject"] = "Redefinição de senha — Drive Data"
     msg["From"]    = settings.smtp_from
     msg["To"]      = to_email
 

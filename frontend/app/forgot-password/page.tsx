@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { FileSearch, Mail, ArrowLeft, CheckCircle, AlertCircle } from "lucide-react";
+import { Mail, ArrowLeft, CheckCircle, AlertCircle } from "lucide-react";
+import { Logo } from "../components/Logo";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -34,12 +35,10 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex items-center gap-2 mb-8">
-          <div className="w-9 h-9 rounded-xl bg-proc-500 flex items-center justify-center shadow">
-            <FileSearch size={18} className="text-white" />
-          </div>
+          <Logo size={36} />
           <div>
-            <div className="font-bold text-slate-900 leading-tight">Licita</div>
-            <div className="text-[11px] text-slate-400">by Acrasystem</div>
+            <div className="font-bold text-slate-900 leading-tight">Drive Data</div>
+            <div className="text-[11px] text-slate-400">Licitações</div>
           </div>
         </div>
 

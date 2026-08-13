@@ -5,17 +5,25 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Paleta Drive Data — azul-ciano principal (extraída do logo)
         proc: {
-          50:  "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          300: "#93c5fd",
-          400: "#60a5fa",
-          500: "#3b82f6",
-          600: "#2563eb",
-          700: "#1d4ed8",
-          800: "#1e40af",
-          900: "#1e3a8a",
+          50:  "#ecfbff",
+          100: "#d6f4fd",
+          200: "#ade9fa",
+          300: "#6bd6f2",
+          400: "#35bce6",
+          500: "#16a0d4",
+          600: "#1177b0",
+          700: "#155d8a",
+          800: "#123f5e",
+          900: "#0b2d45",
+        },
+        // Acento verde Drive Data
+        dgreen: {
+          300: "#7be8a6",
+          400: "#4cdd84",
+          500: "#2fcb6c",
+          600: "#22a95a",
         },
       },
       fontFamily: {

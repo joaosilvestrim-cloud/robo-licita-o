@@ -56,9 +56,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Acrasystem Procurement API",
+    title="Drive Data · Licitações API",
     version="1.0.0",
-    description="Módulo de acompanhamento de licitações públicas.",
+    description="Monitoramento de licitações públicas — por Drive Data.",
     lifespan=lifespan,
 )
 

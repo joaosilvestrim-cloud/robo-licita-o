@@ -7,6 +7,7 @@ import {
   LogOut, ChevronRight, BarChart2, Target, Building2, Database,
 } from "lucide-react";
 import ChatWidget from "../components/ChatWidget";
+import { Logo } from "../components/Logo";
 
 const nav = [
   { href: "/dashboard",              label: "Dashboard",      icon: LayoutDashboard, exact: true },
@@ -62,11 +63,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Brand */}
         <div className="px-5 pt-6 pb-5 border-b border-white/10">
           <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-proc-500 flex items-center justify-center shadow">
-              <FileSearch size={16} className="text-white" />
-            </div>
+            <Logo size={32} />
             <div>
-              <div className="font-bold text-white text-sm leading-tight">Acrasystem</div>
+              <div className="font-bold text-white text-sm leading-tight">Drive Data</div>
               <div className="text-[11px] text-white/40 leading-tight">Licitações</div>
             </div>
           </div>

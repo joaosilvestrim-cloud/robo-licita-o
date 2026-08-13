@@ -7,3 +7,17 @@
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
+
+/* Marca Drive Data — degradê verde→ciano→azul */
+.dd-gradient {
+  background-image: linear-gradient(135deg, #3fd07c 0%, #17b6c6 50%, #1e86e0 100%);
+}
+.dd-gradient:hover {
+  background-image: linear-gradient(135deg, #37c473 0%, #14a9b9 50%, #1a79cf 100%);
+}
+.dd-gradient-text {
+  background: linear-gradient(135deg, #3fd07c, #17b6c6, #1e86e0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
