@@ -29,24 +29,40 @@ primeiro start (`init_db`). Nao precisa ativar RLS: so o backend acessa o banco.
 
 ---
 
-## 2. Render (backend)
+## 2. Koyeb (backend) — recomendado (free, sem cartao, nao dorme)
 
 1. Suba este repositorio no GitHub (ja esta em `joaosilvestrim-cloud/robo-licita-o`).
-2. Em https://render.com: **New > Blueprint** e selecione este repo.
-   O Render le o `render.yaml` e cria o servico `robo-licitacao-api`.
-3. Preencha as variaveis marcadas como "manual":
-   - `DATABASE_URL` = a string do Session Pooler do Supabase (passo 1).
-   - `CORS_ORIGINS` = deixe `*` por enquanto (ajusta depois de ter a URL da Vercel).
-   - `SECRET_KEY` e `CRON_SECRET` o Render gera sozinho. **Copie o valor de `CRON_SECRET`**,
-     voce vai precisar dele no cron.
-   - As de e-mail (`SMTP_*`) e `FRONTEND_URL` pode deixar em branco agora.
-4. Clique em **Apply / Deploy** e espere o build.
-5. Teste: abra `https://SEU-BACKEND.onrender.com/health`. Deve responder
+2. Em https://koyeb.com: **Create Web Service > GitHub** e selecione este repo.
+3. Build:
+   - Builder: **Dockerfile**.
+   - **Work directory**: `backend`.
+   - **Dockerfile location**: `backend/Dockerfile`.
+     (se o Koyeb reclamar do caminho, troque para so `Dockerfile`.)
+4. Exposicao / porta:
+   - Porta: **8000** (protocolo HTTP).
+   - Health check path: `/health`.
+5. Instance: **Free** (nano).
+6. **Environment variables** (aba Environment):
+   - `DATABASE_URL` = string do Session Pooler do Supabase (passo 1).
+   - `PORT` = `8000`.
+   - `ENABLE_SCHEDULER` = `false`.
+   - `CORS_ORIGINS` = `*` (ajusta depois de ter a URL da Vercel).
+   - `SECRET_KEY` = uma frase aleatoria longa (invente qualquer coisa forte).
+   - `CRON_SECRET` = outra frase aleatoria longa. **Guarde este valor** (vai no cron).
+   - E-mail (`SMTP_*`) e `FRONTEND_URL`: deixe em branco por enquanto.
+7. **Deploy** e espere o build.
+8. Teste: abra `https://SEU-APP.koyeb.app/health`. Deve responder
    `{"status":"ok","module":"procurement"}`.
-6. Confira `https://SEU-BACKEND.onrender.com/docs` (Swagger da API).
+9. Confira `https://SEU-APP.koyeb.app/docs` (Swagger da API).
 
-> O plano free dorme apos 15 min sem acesso. A primeira chamada depois disso
-> demora ~30 a 60s pra acordar. Isso e normal e o cron ja trata (com retry).
+> O free do Koyeb fica sempre ligado (nao dorme). O cron so dispara os syncs.
+
+### Alternativa: Render (free, dorme apos 15min)
+
+Este repo tem `render.yaml`. Em https://render.com: **New > Blueprint**, selecione o
+repo, preencha `DATABASE_URL` e `CORS_ORIGINS`. `SECRET_KEY`/`CRON_SECRET` o Render gera.
+O plano free dorme apos 15min; a primeira chamada demora ~30-60s pra acordar (o cron
+ja trata com retry). URL fica `https://SEU-BACKEND.onrender.com`.
 
 ---
 
@@ -56,15 +72,15 @@ primeiro start (`init_db`). Nao precisa ativar RLS: so o backend acessa o banco.
 2. Em **Root Directory**, escolha `frontend`.
 3. Framework: Next.js (detecta sozinho).
 4. Em **Environment Variables**, adicione:
-   - `NEXT_PUBLIC_API_URL` = `https://SEU-BACKEND.onrender.com` (sem barra no final).
+   - `NEXT_PUBLIC_API_URL` = a URL do backend (ex `https://SEU-APP.koyeb.app`), sem barra no final.
 5. Deploy.
 6. Anote a URL final, ex `https://robo-licitacao.vercel.app`.
 
 Depois que tiver a URL da Vercel:
 
-7. Volte no Render e ajuste `CORS_ORIGINS` para a URL da Vercel
-   (ex `https://robo-licitacao.vercel.app`). Salve. O Render redeploy sozinho.
-8. Opcional: ajuste `FRONTEND_URL` no Render para a mesma URL (links de e-mail).
+7. Volte no backend (Koyeb/Render) e ajuste `CORS_ORIGINS` para a URL da Vercel
+   (ex `https://robo-licitacao.vercel.app`). Salve. O backend redeploy sozinho.
+8. Opcional: ajuste `FRONTEND_URL` para a mesma URL (links de e-mail).
 
 ---
 
@@ -74,8 +90,8 @@ Os syncs sao disparados por um workflow em `.github/workflows/sync.yml`.
 
 1. No GitHub do repo: **Settings > Secrets and variables > Actions > New repository secret**.
 2. Crie dois secrets:
-   - `API_URL` = `https://SEU-BACKEND.onrender.com`
-   - `CRON_SECRET` = o mesmo valor gerado no Render no passo 2.
+   - `API_URL` = a URL do backend (ex `https://SEU-APP.koyeb.app`).
+   - `CRON_SECRET` = o mesmo valor que voce colocou no backend (passo 2).
 3. Em **Actions**, habilite os workflows se pedir.
 4. Teste manual: abra o workflow **Sync licitacoes (cron)** e clique em **Run workflow**.
    Deixe `source = pncp`. Isso puxa licitacoes reais do PNCP pro banco.
