@@ -25,6 +25,9 @@ services:
       # Agendador interno desligado: os syncs vem do cron externo.
       - key: ENABLE_SCHEDULER
         value: "false"
+      # Schema isolado no Postgres (nao mistura com outros apps no mesmo banco).
+      - key: DB_SCHEMA
+        value: licita
       # Origens liberadas no CORS. Coloque a URL do front na Vercel.
       - key: CORS_ORIGINS
         sync: false

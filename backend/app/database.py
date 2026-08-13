@@ -1,3 +1,4 @@
+import re
 import ssl
 from urllib.parse import urlsplit, urlunsplit, parse_qsl
 
@@ -40,7 +41,18 @@ def _connect_args(url: str) -> dict:
         args["ssl"] = ctx
         # obrigatório para o Transaction Pooler (porta 6543) e inofensivo no resto
         args["statement_cache_size"] = 0
+    # direciona todas as tabelas do robô para o schema isolado (search_path)
+    schema = (settings.db_schema or "public").strip()
+    if schema and schema != "public":
+        args["server_settings"] = {"search_path": schema}
     return args
+
+
+def _safe_schema(name: str) -> str:
+    name = (name or "public").strip()
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
+        raise ValueError(f"db_schema inválido: {name!r}")
+    return name
 
 
 DATABASE_URL = _normalize_db_url(settings.database_url)
@@ -65,7 +77,11 @@ async def get_session():
 async def init_db():
     from app.db import models  # noqa: F401 — ensure models are registered
     from sqlalchemy import text
+    schema = _safe_schema(settings.db_schema)
     async with engine.begin() as conn:
+        # cria o schema isolado antes de tudo (search_path já aponta pra ele)
+        if schema != "public":
+            await conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
         await conn.run_sync(SQLModel.metadata.create_all)
 
         # ── Migrations incrementais ────────────────────────────────────────────

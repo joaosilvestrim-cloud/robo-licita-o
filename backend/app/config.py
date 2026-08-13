@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # Origens permitidas no CORS. "*" libera geral. Em prod, use a URL do front.
     cors_origins: str = "*"
 
+    # Schema do Postgres onde ficam as tabelas do robô. Isola de outros apps no
+    # mesmo banco (ex.: o demo do CRM). "public" = comportamento padrão.
+    db_schema: str = "public"
+
     class Config:
         env_file = ".env"
         extra = "ignore"
