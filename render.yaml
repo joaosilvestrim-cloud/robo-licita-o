@@ -1,0 +1,46 @@
+# Blueprint do Render para o backend FastAPI.
+# No painel do Render: New > Blueprint > aponte pra este repositorio.
+# As variaveis marcadas com `sync: false` voce preenche manualmente no painel.
+# Veja DEPLOY.md para os valores de cada uma.
+services:
+  - type: web
+    name: robo-licitacao-api
+    runtime: docker
+    plan: free                 # free dorme apos 15min sem request (ok, o cron acorda)
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Connection string do Supabase (use o Session Pooler, porta 5432). Ver DEPLOY.md.
+      - key: DATABASE_URL
+        sync: false
+      # Segredo de assinatura do JWT. O Render gera um forte automaticamente.
+      - key: SECRET_KEY
+        generateValue: true
+      # Segredo que o cron externo usa no header X-Cron-Secret. Guarde o valor gerado.
+      - key: CRON_SECRET
+        generateValue: true
+      # Agendador interno desligado: os syncs vem do cron externo.
+      - key: ENABLE_SCHEDULER
+        value: "false"
+      # Origens liberadas no CORS. Coloque a URL do front na Vercel.
+      - key: CORS_ORIGINS
+        sync: false
+      # Opcionais (SSO / e-mail). Deixe em branco se nao usar por enquanto.
+      - key: SSO_KEY
+        value: acra-sso-2024
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      # URL do proprio front, usada nos links de e-mail (reset de senha).
+      - key: FRONTEND_URL
+        sync: false

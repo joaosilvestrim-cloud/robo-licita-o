@@ -1,0 +1,65 @@
+name: Sync licitacoes (cron)
+
+# Dispara os sincronizadores do backend por HTTP.
+# O backend na Render pode dormir; a primeira chamada acorda ele (cold start).
+#
+# Secrets necessarios no repositorio (Settings > Secrets and variables > Actions):
+#   API_URL      -> URL publica do backend, ex: https://robo-licitacao-api.onrender.com
+#   CRON_SECRET  -> mesmo valor gerado no Render (env CRON_SECRET)
+
+on:
+  schedule:
+    - cron: "0 * * * *"     # de hora em hora  -> processa alertas
+    - cron: "0 */6 * * *"   # a cada 6 horas   -> PNCP (fonte principal)
+    - cron: "30 */8 * * *"  # a cada 8 horas   -> ComprasNet federal
+    - cron: "0 3,15 * * *"  # 2x ao dia        -> Querido Diario + keywords dos perfis
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Fonte para sync manual (pncp, comprasnet, dou, keywords, alerts, all)"
+        required: false
+        default: "pncp"
+      days_back:
+        description: "Quantos dias para tras"
+        required: false
+        default: "3"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Acordar o backend
+        run: |
+          curl -s -o /dev/null --max-time 150 --retry 5 --retry-all-errors \
+            --retry-delay 15 "${{ secrets.API_URL }}/health" || true
+
+      - name: Disparar sync
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -e
+          call() {
+            echo "POST /api/sync/$1 (days_back=${2:-3})"
+            curl -s --max-time 150 --retry 3 --retry-all-errors --retry-delay 20 \
+              -X POST \
+              -H "X-Cron-Secret: ${CRON_SECRET}" \
+              "${API_URL}/api/sync/$1?days_back=${2:-3}"
+            echo ""
+          }
+
+          SCHEDULE="${{ github.event.schedule }}"
+          if [ -n "${{ github.event.inputs.source }}" ] && [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            call "${{ github.event.inputs.source }}" "${{ github.event.inputs.days_back }}"
+          elif [ "$SCHEDULE" = "0 * * * *" ]; then
+            call "alerts"
+          elif [ "$SCHEDULE" = "0 */6 * * *" ]; then
+            call "pncp" "2"
+          elif [ "$SCHEDULE" = "30 */8 * * *" ]; then
+            call "comprasnet" "7"
+          elif [ "$SCHEDULE" = "0 3,15 * * *" ]; then
+            call "dou" "3"
+            call "keywords"
+          else
+            call "pncp" "3"
+          fi

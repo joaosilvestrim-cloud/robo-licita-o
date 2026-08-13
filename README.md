@@ -5,6 +5,8 @@
 **Produção:** [licita.nanuck.com.br](https://licita.nanuck.com.br) — deploy rodando a partir de `/root/products/saas-licitacoes/`.
 **Repo:** extraído do monorepo `nanuck-platform` (preserva o commit inicial).
 
+> 🚀 **Deploy em nuvem sem servidor próprio:** guia passo a passo em [`DEPLOY.md`](DEPLOY.md) usando **Supabase** (banco) + **Render** (backend) + **Vercel** (frontend) + **GitHub Actions** (cron dos syncs). É o caminho recomendado para colocar no ar sem a infra Nanuck.
+
 > ⚠️ **CRÍTICO — preservação de dados:** sempre opere este Compose com **`-p procurement`** (nome do projeto). O volume do banco é prefixado pelo nome do projeto → `procurement_procurement_postgres`. Se você rodar sem `-p` (o default viraria `saas-licitacoes`), **um volume vazio novo seria criado e o app subiria com banco em branco**. Mantenha `-p procurement` em todo `docker compose`.
 
 ---

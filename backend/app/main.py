@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from app.config import settings
 from app.database import init_db
 from app.api import auth, bids, profiles, alerts, tracking, dashboard, sync, cnpj, chat, companies, interactions, users, sources, municipal_portals
 from app.cron.jobs import (
@@ -26,26 +27,32 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized.")
 
-    # days_back=7 garante que dias sem sync (restart, falha) sejam recuperados
-    scheduler.add_job(run_pncp_sync,          "interval", hours=6,  id="pncp_sync")
-    scheduler.add_job(run_comprasnet_sync,     "interval", hours=8,  id="comprasnet_sync")
-    scheduler.add_job(run_bec_sp_sync,         "interval", hours=8,  id="bec_sp_sync")
-    scheduler.add_job(run_licitacoes_e_sync,             "interval", hours=8,  id="licitacoes_e_sync")
-    scheduler.add_job(run_querido_diario_sync,           "interval", hours=12, id="querido_diario_sync")
-    scheduler.add_job(run_portal_compras_publicas_sync,  "interval", hours=8,  id="portal_compras_publicas_sync")
-    scheduler.add_job(run_e_lic_sc_sync,                 "interval", hours=8,  id="e_lic_sc_sync")
-    scheduler.add_job(run_celic_rs_sync,                 "interval", hours=8,  id="celic_rs_sync")
-    scheduler.add_job(run_comprasnet_ba_sync,            "interval", hours=8,  id="comprasnet_ba_sync")
-    scheduler.add_job(run_compra_aberta_sync,            "interval", hours=8,  id="compra_aberta_sync")
-    scheduler.add_job(run_bnc_sync,                      "interval", hours=8,  id="bnc_sync")
-    scheduler.add_job(run_keyword_sync,         "interval", hours=12, id="keyword_sync")
-    scheduler.add_job(run_alert_processing,     "interval", hours=1,  id="alert_processing")
-    scheduler.add_job(run_cleanup,              "cron", hour=1, minute=0, id="close_expired_bids")
-    scheduler.start()
-    logger.info("APScheduler started.")
+    # Agendador interno é opcional. Em cloud (Render + cron externo) fica desligado
+    # via ENABLE_SCHEDULER=false, e os syncs são disparados por HTTP pelo cron.
+    if settings.enable_scheduler:
+        # days_back=7 garante que dias sem sync (restart, falha) sejam recuperados
+        scheduler.add_job(run_pncp_sync,          "interval", hours=6,  id="pncp_sync")
+        scheduler.add_job(run_comprasnet_sync,     "interval", hours=8,  id="comprasnet_sync")
+        scheduler.add_job(run_bec_sp_sync,         "interval", hours=8,  id="bec_sp_sync")
+        scheduler.add_job(run_licitacoes_e_sync,             "interval", hours=8,  id="licitacoes_e_sync")
+        scheduler.add_job(run_querido_diario_sync,           "interval", hours=12, id="querido_diario_sync")
+        scheduler.add_job(run_portal_compras_publicas_sync,  "interval", hours=8,  id="portal_compras_publicas_sync")
+        scheduler.add_job(run_e_lic_sc_sync,                 "interval", hours=8,  id="e_lic_sc_sync")
+        scheduler.add_job(run_celic_rs_sync,                 "interval", hours=8,  id="celic_rs_sync")
+        scheduler.add_job(run_comprasnet_ba_sync,            "interval", hours=8,  id="comprasnet_ba_sync")
+        scheduler.add_job(run_compra_aberta_sync,            "interval", hours=8,  id="compra_aberta_sync")
+        scheduler.add_job(run_bnc_sync,                      "interval", hours=8,  id="bnc_sync")
+        scheduler.add_job(run_keyword_sync,         "interval", hours=12, id="keyword_sync")
+        scheduler.add_job(run_alert_processing,     "interval", hours=1,  id="alert_processing")
+        scheduler.add_job(run_cleanup,              "cron", hour=1, minute=0, id="close_expired_bids")
+        scheduler.start()
+        logger.info("APScheduler started (%d jobs).", len(scheduler.get_jobs()))
+    else:
+        logger.info("APScheduler desligado (ENABLE_SCHEDULER=false). Syncs via cron externo.")
     yield
-    scheduler.shutdown()
-    logger.info("APScheduler stopped.")
+    if settings.enable_scheduler:
+        scheduler.shutdown()
+        logger.info("APScheduler stopped.")
 
 
 app = FastAPI(
@@ -55,9 +62,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

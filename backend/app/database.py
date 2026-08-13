@@ -1,9 +1,58 @@
+import ssl
+from urllib.parse import urlsplit, urlunsplit, parse_qsl
+
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.config import settings
 
-engine = create_async_engine(settings.database_url, echo=False, future=True)
+
+def _normalize_db_url(url: str) -> str:
+    """Garante o driver asyncpg e remove query params que o asyncpg não entende.
+
+    Aceita tanto a string do Supabase (postgresql://...?sslmode=require)
+    quanto a interna (postgresql+asyncpg://...). Params de SSL/pgbouncer
+    são tratados via connect_args, não na URL.
+    """
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+
+    parts = urlsplit(url)
+    # descarta sslmode, pgbouncer, etc. — o asyncpg rejeita esses na querystring
+    kept = [(k, v) for k, v in parse_qsl(parts.query) if k.lower() not in
+            ("sslmode", "pgbouncer", "channel_binding", "target_session_attrs")]
+    query = "&".join(f"{k}={v}" for k, v in kept)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
+
+
+def _connect_args(url: str) -> dict:
+    """SSL + desliga cache de prepared statements (necessário no pooler do Supabase)."""
+    args: dict = {}
+    # Qualquer host que não seja local roda com SSL (Supabase exige).
+    host = urlsplit(url).hostname or ""
+    if host not in ("localhost", "127.0.0.1", "postgres", "db"):
+        ctx = ssl.create_default_context()
+        # o pooler do Supabase pode ter CN diferente do host; não verificamos o cert
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        args["ssl"] = ctx
+        # obrigatório para o Transaction Pooler (porta 6543) e inofensivo no resto
+        args["statement_cache_size"] = 0
+    return args
+
+
+DATABASE_URL = _normalize_db_url(settings.database_url)
+
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    future=True,
+    pool_pre_ping=True,          # revalida conexões (o backend pode dormir na Render)
+    pool_recycle=1800,
+    connect_args=_connect_args(DATABASE_URL),
+)
 
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -28,6 +77,11 @@ async def init_db():
         await conn.execute(text(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_bid_interactions_user_bid "
             "ON bid_interactions(user_id, bid_id)"
+        ))
+        # índice único em public_bids (source × external_id) — evita duplicidade de licitação
+        await conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_public_bids_source_external "
+            "ON public_bids(source, external_id)"
         ))
         # seed das fontes de dados
         await conn.execute(text("""

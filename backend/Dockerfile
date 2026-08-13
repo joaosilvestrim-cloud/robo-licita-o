@@ -7,4 +7,5 @@ COPY . .
 RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
 USER appuser
 EXPOSE 8003
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003"]
+# Render injeta $PORT. Local usa 8003 por padrão.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8003}"]

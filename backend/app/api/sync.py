@@ -5,7 +5,7 @@ from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.db.models import ScrapeLog, User
-from app.auth import get_current_user
+from app.auth import get_current_user, require_user_or_cron
 from app.services.pncp import sync_pncp
 from app.services.pncp_search import sync_keyword, sync_all_profile_keywords
 from app.services.alerts import process_alerts
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/sync", tags=["sync"])
 async def trigger_full_sync(
     background_tasks: BackgroundTasks,
     days_back: int = Query(3, ge=1, le=180),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_user_or_cron),
 ):
     """Sincroniza licitações por data (PNCP) + keywords dos perfis + processa alertas."""
     async def _run():
@@ -50,7 +50,7 @@ class KeywordSearchBody(BaseModel):
 async def sync_by_keyword(
     body: KeywordSearchBody,
     background_tasks: BackgroundTasks,
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_user_or_cron),
 ):
     """Busca licitações no PNCP por palavra-chave específica (full-text nos editais)."""
     async def _run():
@@ -65,7 +65,7 @@ async def sync_by_keyword(
 @router.post("/keywords/profiles")
 async def sync_profile_keywords(
     background_tasks: BackgroundTasks,
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_user_or_cron),
 ):
     """Busca no PNCP por todas as keywords e ramos dos perfis ativos."""
     background_tasks.add_task(sync_all_profile_keywords)
@@ -76,7 +76,7 @@ async def sync_profile_keywords(
 async def trigger_all_sources(
     background_tasks: BackgroundTasks,
     days_back: int = Query(1, ge=1, le=30),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_user_or_cron),
 ):
     """Dispara sync de todas as fontes em background."""
     async def _run():
@@ -102,7 +102,7 @@ async def trigger_source_sync(
     source: str,
     background_tasks: BackgroundTasks,
     days_back: int = Query(3, ge=1, le=180),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_user_or_cron),
 ):
     SOURCE_MAP = {
         "pncp":        (sync_pncp,           {"days_back": days_back}),
@@ -130,7 +130,7 @@ async def trigger_source_sync(
 @router.get("/status")
 async def sync_status(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_user_or_cron),
 ):
     result = await session.execute(
         select(ScrapeLog).order_by(ScrapeLog.created_at.desc()).limit(20)

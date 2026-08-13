@@ -24,6 +24,15 @@ class Settings(BaseSettings):
     # Intervalo de sincronização em horas
     pncp_sync_interval_hours: int = 6
 
+    # Agendador interno. Em cloud (Render + cron externo) fica desligado.
+    enable_scheduler: bool = False
+
+    # Segredo para o cron externo chamar os endpoints de sync sem JWT de usuário.
+    cron_secret: str = ""
+
+    # Origens permitidas no CORS. "*" libera geral. Em prod, use a URL do front.
+    cors_origins: str = "*"
+
     class Config:
         env_file = ".env"
         extra = "ignore"
