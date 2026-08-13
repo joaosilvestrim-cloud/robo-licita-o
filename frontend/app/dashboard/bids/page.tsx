@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { Search, FileSearch, ExternalLink, BookmarkPlus, ChevronLeft, ChevronRight, X, MapPin, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Search, FileSearch, ExternalLink, BookmarkPlus, ChevronLeft, ChevronRight, X, MapPin, ArrowUp, ArrowDown, ArrowUpDown, Cpu } from "lucide-react";
 import BidDrawer from "../../components/BidDrawer";
 import { useRouter } from "next/navigation";
 
@@ -91,6 +91,7 @@ export default function BidsPage() {
   const [sortDir, setSortDir]       = useState<"asc" | "desc">("asc");
   const [selectedStatus, setSelectedStatus] = useState<Set<string>>(new Set(["aberta"]));
   const [onlyOpenForProposals, setOnlyOpenForProposals] = useState(true);
+  const [itMode, setItMode]         = useState(false);
 
   const limit = 20;
   const pages = Math.ceil(total / limit);
@@ -127,7 +128,8 @@ export default function BidsPage() {
     if (onlyOpenForProposals) params.set("only_open_for_proposals", "true");
 
     try {
-      const res = await fetch(`${API}/api/bids?${params}`, {
+      const endpoint = itMode ? "/api/bids/ti" : "/api/bids";
+      const res = await fetch(`${API}${endpoint}?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -139,7 +141,7 @@ export default function BidsPage() {
       setTotal(data.total ?? 0);
     } catch {}
     setLoading(false);
-  }, [page, q, sphere, state, city, sortBy, sortDir, selectedStatus, onlyOpenForProposals, token]);
+  }, [page, q, sphere, state, city, sortBy, sortDir, selectedStatus, onlyOpenForProposals, itMode, token]);
 
   function toggleSort(col: string) {
     if (sortBy === col) {
@@ -201,14 +203,27 @@ export default function BidsPage() {
                 <MapPin size={15} className={showMap ? "text-proc-500" : ""} />
               </button>
               <div>
-                <h1 className="text-xl font-bold text-slate-900">Licitações</h1>
+                <h1 className="text-xl font-bold text-slate-900">
+                  {itMode ? "Licitações de TI & Dados" : "Licitações"}
+                </h1>
                 <p className="text-slate-400 text-xs">
                   {total.toLocaleString("pt-BR")} encontradas
+                  {itMode ? " · ranqueadas por relevância" : ""}
                   {state ? ` · ${state}` : ""}
                   {city ? ` · ${city}` : ""}
                 </p>
               </div>
             </div>
+
+            <button
+              onClick={() => { setItMode(m => !m); setPage(1); }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition ${
+                itMode ? "text-white shadow dd-gradient" : "border border-proc-200 text-proc-700 hover:bg-proc-50"
+              }`}
+              title="Só licitações de TI & Dados, ranqueadas por relevância"
+            >
+              <Cpu size={15} /> TI &amp; Dados
+            </button>
           </div>
 
           {/* Filtros */}

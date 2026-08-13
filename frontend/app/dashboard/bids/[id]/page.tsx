@@ -45,7 +45,8 @@ const MODALITY_LABEL: Record<string, string> = {
 
 // ─── extrai cnpj/tipo/ano/seq do external_id ─────────────────────────────────
 // Formato: "44477909000100-1-000303/2026"
-function parseExternalId(externalId: string) {
+function parseExternalId(externalId: string | null | undefined) {
+  if (!externalId) return null;
   const m = externalId.match(/^(\d+)-(\d+)-0*(\d+)\/(\d+)$/);
   if (!m) return null;
   return { cnpj: m[1], tipo: m[2], seq: m[3], ano: m[4] };
