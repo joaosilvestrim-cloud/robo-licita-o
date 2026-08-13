@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Drive Data · Licitações",
-  description: "Monitore licitações públicas em todo o Brasil — por Drive Data",
+  title: "Sonar · por Drive Data",
+  description: "Sonar — monitore licitações públicas em todo o Brasil. Por Drive Data.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -56,9 +56,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Drive Data · Licitações API",
+    title="Sonar · API",
     version="1.0.0",
-    description="Monitoramento de licitações públicas — por Drive Data.",
+    description="Sonar — monitoramento de licitações públicas. Por Drive Data.",
     lifespan=lifespan,
 )
 

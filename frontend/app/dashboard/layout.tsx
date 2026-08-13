@@ -65,8 +65,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex items-center gap-2.5 mb-3">
             <Logo size={32} />
             <div>
-              <div className="font-bold text-white text-sm leading-tight">Drive Data</div>
-              <div className="text-[11px] text-white/40 leading-tight">Licitações</div>
+              <div className="font-bold text-white text-sm leading-tight">Sonar</div>
+              <div className="text-[11px] text-white/40 leading-tight">por Drive Data</div>
             </div>
           </div>
           {tenantName && (

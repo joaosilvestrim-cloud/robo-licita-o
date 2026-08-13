@@ -145,8 +145,8 @@ export default function LoginPage() {
         <div className="flex items-center gap-3">
           <Logo size={38} />
           <div>
-            <div className="font-bold text-lg leading-tight">Drive Data</div>
-            <div className="text-xs text-white/40 leading-tight">Licitações</div>
+            <div className="font-bold text-lg leading-tight">Sonar</div>
+            <div className="text-xs text-white/40 leading-tight">por Drive Data</div>
           </div>
         </div>
         <div>
@@ -157,7 +157,7 @@ export default function LoginPage() {
             Acompanhe licitações federais, estaduais e municipais com alertas personalizados, mapa de calor e agente IA que encontra oportunidades para sua empresa.
           </p>
           <div className="space-y-2.5 text-sm text-white/70">
-            {["PNCP integrado — dados em tempo real", "Mapa de calor por estado e cidade", "Alertas por perfil + score de relevância", "Assistente Drive Data para auxiliar sua busca"].map(f => (
+            {["PNCP integrado — dados em tempo real", "Mapa de calor por estado e cidade", "Alertas por perfil + score de relevância", "Assistente Sonar para auxiliar sua busca"].map(f => (
               <div key={f} className="flex items-center gap-2.5">
                 <CheckCircle size={14} className="text-proc-300 shrink-0" />
                 {f}

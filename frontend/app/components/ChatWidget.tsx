@@ -6,7 +6,7 @@ type Msg = { role: "user" | "assistant"; content: string };
 
 const WELCOME: Msg = {
   role: "assistant",
-  content: "Olá! Sou o **Assistente Drive Data**, seu assistente de licitações. Posso ajudar você a:\n\n• Buscar licitações por área de atuação\n• Criar perfis de monitoramento\n• Explicar modalidades e termos jurídicos\n• Sugerir palavras-chave com base no seu CNAE\n• Disparar buscas específicas no PNCP\n\nComo posso ajudar hoje?",
+  content: "Olá! Sou o **Assistente Sonar**, seu assistente de licitações. Posso ajudar você a:\n\n• Buscar licitações por área de atuação\n• Criar perfis de monitoramento\n• Explicar modalidades e termos jurídicos\n• Sugerir palavras-chave com base no seu CNAE\n• Disparar buscas específicas no PNCP\n\nComo posso ajudar hoje?",
 };
 
 function renderContent(text: string) {
@@ -97,7 +97,7 @@ export default function ChatWidget() {
               <Bot size={15} className="text-white" />
             </div>
             <div>
-              <div className="text-sm font-semibold text-white leading-tight">Assistente Drive Data</div>
+              <div className="text-sm font-semibold text-white leading-tight">Assistente Sonar</div>
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-[10px] text-white/50">Assistente de licitações</span>
@@ -185,7 +185,7 @@ export default function ChatWidget() {
           open ? "bg-slate-700 hover:bg-slate-800" : "bg-proc-500 hover:bg-proc-600"
         }`}
         style={{ width: 52, height: 52 }}
-        title="Assistente Drive Data"
+        title="Assistente Sonar"
       >
         {open ? <X size={20} /> : <MessageCircle size={22} />}
         {unread && !open && (

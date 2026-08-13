@@ -49,8 +49,8 @@ function ResetForm() {
         <div className="flex items-center gap-2 mb-8">
           <Logo size={36} />
           <div>
-            <div className="font-bold text-slate-900 leading-tight">Drive Data</div>
-            <div className="text-[11px] text-slate-400">Licitações</div>
+            <div className="font-bold text-slate-900 leading-tight">Sonar</div>
+            <div className="text-[11px] text-slate-400">por Drive Data</div>
           </div>
         </div>
 
