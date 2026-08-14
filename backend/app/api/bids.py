@@ -342,29 +342,51 @@ async def list_ti_bids(
     if hit is not None:
         return hit
 
-    # Consulta indexada usando a relevância pré-calculada (is_ti / ti_score)
-    stmt = select(PublicBid).where(PublicBid.is_ti == True)  # noqa: E712
-    stmt = _apply_filters(stmt, None, state, None, None, status, None,
-                          min_value, max_value, None, None,
-                          only_open_for_proposals, None)
+    result = None
+    # Caminho rápido: consulta indexada usando a relevância pré-calculada.
+    try:
+        stmt = select(PublicBid).where(PublicBid.is_ti == True)  # noqa: E712
+        stmt = _apply_filters(stmt, None, state, None, None, status, None,
+                              min_value, max_value, None, None,
+                              only_open_for_proposals, None)
+        total = (await session.execute(
+            select(func.count()).select_from(stmt.subquery())
+        )).scalar_one()
+        if total > 0:  # se 0, pode ser que ainda não fez backfill -> usa fallback
+            stmt = stmt.order_by(
+                PublicBid.ti_score.desc().nullslast(),
+                PublicBid.closing_date.asc().nullslast(),
+            ).offset((page - 1) * limit).limit(limit)
+            rows = (await session.execute(stmt)).scalars().all()
+            result = {
+                "total": total, "page": page, "limit": limit,
+                "pages": (total + limit - 1) // limit,
+                "data": [{**_bid_summary(b), "relevance": b.ti_score} for b in rows],
+            }
+    except Exception:
+        result = None  # coluna ausente/não pronta -> cai no cálculo em memória
 
-    total = (await session.execute(
-        select(func.count()).select_from(stmt.subquery())
-    )).scalar_one()
+    # Fallback: pontua em Python (usado enquanto is_ti não estiver populado)
+    if result is None:
+        base = select(PublicBid)
+        base = _apply_filters(base, None, state, None, None, status, None,
+                              min_value, max_value, None, None,
+                              only_open_for_proposals, None)
+        rows = (await session.execute(base.limit(3000))).scalars().all()
+        scored = []
+        for b in rows:
+            strong, weak = _it_counts(b)
+            if strong >= 1:
+                scored.append((strong * 3 + weak, b))
+        scored.sort(key=lambda x: (-x[0], x[1].closing_date or date.max, -float(x[1].estimated_value or 0)))
+        total = len(scored)
+        page_items = scored[(page - 1) * limit:(page - 1) * limit + limit]
+        result = {
+            "total": total, "page": page, "limit": limit,
+            "pages": (total + limit - 1) // limit,
+            "data": [{**_bid_summary(b), "relevance": score} for score, b in page_items],
+        }
 
-    stmt = stmt.order_by(
-        PublicBid.ti_score.desc().nullslast(),
-        PublicBid.closing_date.asc().nullslast(),
-    ).offset((page - 1) * limit).limit(limit)
-    rows = (await session.execute(stmt)).scalars().all()
-
-    result = {
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "pages": (total + limit - 1) // limit,
-        "data": [{**_bid_summary(b), "relevance": b.ti_score} for b in rows],
-    }
     cache_set(ck, result, ttl=150)
     return result
 
