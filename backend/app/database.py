@@ -99,6 +99,19 @@ async def init_db():
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_public_bids_source_external "
             "ON public_bids(source, external_id)"
         ))
+        # ── Índices de performance para busca/filtros em public_bids ──────────
+        for idx_sql in [
+            "CREATE INDEX IF NOT EXISTS ix_bids_status        ON public_bids(status)",
+            "CREATE INDEX IF NOT EXISTS ix_bids_state         ON public_bids(state)",
+            "CREATE INDEX IF NOT EXISTS ix_bids_sphere        ON public_bids(sphere)",
+            "CREATE INDEX IF NOT EXISTS ix_bids_modality      ON public_bids(modality)",
+            "CREATE INDEX IF NOT EXISTS ix_bids_closing       ON public_bids(closing_date)",
+            "CREATE INDEX IF NOT EXISTS ix_bids_estvalue      ON public_bids(estimated_value)",
+            "CREATE INDEX IF NOT EXISTS ix_bids_source        ON public_bids(source)",
+            # composto para a consulta mais comum: abertas com prazo válido
+            "CREATE INDEX IF NOT EXISTS ix_bids_status_closing ON public_bids(status, closing_date)",
+        ]:
+            await conn.execute(text(idx_sql))
         # seed das fontes de dados
         await conn.execute(text("""
             INSERT INTO data_sources (key, name, description, official_url, active, created_at)

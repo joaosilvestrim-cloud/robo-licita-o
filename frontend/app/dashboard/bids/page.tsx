@@ -188,7 +188,11 @@ export default function BidsPage() {
       : <ArrowDown size={11} className="text-proc-500" />;
   }
 
-  useEffect(() => { load(); }, [load]);
+  // debounce: espera 300ms de "silêncio" antes de buscar (evita 1 request por tecla)
+  useEffect(() => {
+    const t = setTimeout(load, 300);
+    return () => clearTimeout(t);
+  }, [load]);
 
   async function startTracking(bidId: number, silent = false) {
     const res = await fetch(`${API}/api/tracking/${bidId}`, {
@@ -376,7 +380,7 @@ export default function BidsPage() {
         {/* Tabela */}
         <div className="flex-1 overflow-auto">
           <div className="bg-white">
-            {loading ? (
+            {loading && bids.length === 0 ? (
               <div className="flex items-center justify-center py-20">
                 <span className="w-8 h-8 border-4 border-proc-200 border-t-proc-500 rounded-full animate-spin" />
               </div>
@@ -387,7 +391,7 @@ export default function BidsPage() {
                 <p className="text-xs mt-1 text-slate-400">Ajuste os filtros ou sincronize no Dashboard.</p>
               </div>
             ) : (
-              <table className="w-full text-sm">
+              <table className={`w-full text-sm ${loading ? "opacity-50 transition-opacity" : "transition-opacity"}`}>
                 <thead className="sticky top-0 bg-slate-50 z-10">
                   <tr className="border-b border-slate-100">
                     <th className="text-left px-4 py-2.5">
