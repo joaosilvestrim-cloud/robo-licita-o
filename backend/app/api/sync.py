@@ -98,6 +98,20 @@ async def trigger_all_sources(
     return {"message": f"Sync de todas as fontes iniciado (últimos {days_back} dias)"}
 
 
+@router.post("/digest")
+async def send_digest(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_user_or_cron),
+):
+    """Monta e envia o digest diário de oportunidades de TI & Dados via Telegram."""
+    from app.services.notify import build_ti_digest, send_telegram
+    text = await build_ti_digest(session)
+    if not text:
+        return {"sent": False, "reason": "sem oportunidades de TI abertas"}
+    ok = await send_telegram(text)
+    return {"sent": ok, "note": None if ok else "Telegram não configurado (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)"}
+
+
 @router.post("/close-expired")
 async def close_expired(_: User = Depends(require_user_or_cron)):
     """Encerra licitações cujo prazo (closing_date) já venceu e limpa alertas

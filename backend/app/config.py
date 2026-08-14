@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # mesmo banco (ex.: o demo do CRM). "public" = comportamento padrão.
     db_schema: str = "public"
 
+    # Notificação proativa via Telegram (bot grátis: @BotFather).
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+
     # IA — Assistente Sonar via Groq (API compatível com OpenAI).
     groq_api_key: str = ""
     groq_model: str = "llama-3.3-70b-versatile"
