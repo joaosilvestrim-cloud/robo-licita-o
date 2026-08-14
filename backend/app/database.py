@@ -99,8 +99,12 @@ async def init_db():
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_public_bids_source_external "
             "ON public_bids(source, external_id)"
         ))
+        # Classificação TI & Dados pré-calculada (colunas + índice)
+        await conn.execute(text("ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS is_ti BOOLEAN"))
+        await conn.execute(text("ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS ti_score INTEGER"))
         # ── Índices de performance para busca/filtros em public_bids ──────────
         for idx_sql in [
+            "CREATE INDEX IF NOT EXISTS ix_bids_ti          ON public_bids(is_ti, ti_score)",
             "CREATE INDEX IF NOT EXISTS ix_bids_status        ON public_bids(status)",
             "CREATE INDEX IF NOT EXISTS ix_bids_state         ON public_bids(state)",
             "CREATE INDEX IF NOT EXISTS ix_bids_sphere        ON public_bids(sphere)",

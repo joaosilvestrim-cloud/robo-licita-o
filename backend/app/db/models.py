@@ -192,6 +192,10 @@ class PublicBid(SQLModel, table=True):
     details_url: Optional[str] = Field(default=None, max_length=500)
     platform_url: Optional[str] = Field(default=None, max_length=500)
 
+    # Classificação TI & Dados pré-calculada no sync (deixa a busca instantânea)
+    is_ti: Optional[bool] = Field(default=None)
+    ti_score: Optional[int] = Field(default=None)
+
     # Sistema
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

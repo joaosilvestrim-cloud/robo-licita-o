@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.db.models import ScrapeLog, User
 from app.auth import get_current_user, require_user_or_cron
-from app.services.pncp import sync_pncp, sync_pncp_proposta
+from app.services.pncp import sync_pncp, sync_pncp_proposta, reindex_ti
 from app.services.pncp_search import sync_keyword, sync_all_profile_keywords
 from app.services.alerts import process_alerts
 from app.services.comprasnet import sync_comprasnet
@@ -110,6 +110,13 @@ async def send_digest(
         return {"sent": False, "reason": "sem oportunidades de TI abertas"}
     ok = await send_telegram(text)
     return {"sent": ok, "note": None if ok else "Telegram não configurado (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)"}
+
+
+@router.post("/reindex-ti")
+async def reindex_ti_endpoint(_: User = Depends(require_user_or_cron)):
+    """Backfill/atualiza a classificação de TI (is_ti/ti_score) das licitações."""
+    n = await reindex_ti()
+    return {"reindexed": n}
 
 
 @router.post("/close-expired")

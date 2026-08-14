@@ -301,45 +301,12 @@ async def bid_stats(
 
 # ─── Busca especializada em TI & Dados (foco Drive Data) ─────────────────────
 import re as _re
-
-# Sinais FORTES de TI/dados: presença de qualquer um já classifica a licitação.
-_IT_STRONG = [
-    "software", "sistema de informação", "sistema informatizado", "sistemas de informação",
-    "tecnologia da informação", "informática", "banco de dados", "base de dados",
-    "business intelligence", "power bi", "análise de dados", "ciência de dados",
-    "big data", "data warehouse", "data lake", "data center", "datacenter",
-    "computação em nuvem", "cloud", "erp", "crm", "geoprocessamento", "sig ",
-    "inteligência artificial", "machine learning", "aprendizado de máquina",
-    "desenvolvimento de sistema", "desenvolvimento de software", "fábrica de software",
-    "segurança da informação", "cibersegurança", "assinatura eletrônica",
-    "certificado digital", "dashboard", "etl", "api", "governança de dados",
-    "licença de software", "licenciamento de software", "sistema de gestão",
-    "portal web", "aplicativo", "aplicação web", "ti ", " ti",
-]
-# Sinais FRACOS: reforçam relevância, mas só valem quando há pelo menos 1 sinal forte.
-_IT_WEAK = [
-    "dados", "servidor", "servidores", "infraestrutura de ti", "rede de computadores",
-    "firewall", "backup", "storage", "hospedagem", "datacenter", "automação",
-    "integração de sistemas", "suporte técnico", "helpdesk", "service desk",
-    "link de internet", "conectividade", "telecomunicações", "computador",
-    "notebook", "microcomputador", "impressora", "outsourcing de impressão",
-    "scanner", "equipamento de informática", "nuvem", "portal", "website",
-]
-
-
-def _mk_re(words):
-    return _re.compile(r"(?<!\w)(" + "|".join(_re.escape(w.strip()) for w in words) + r")(?!\w)", _re.IGNORECASE)
-
-
-_IT_STRONG_RE = _mk_re(_IT_STRONG)
-_IT_WEAK_RE = _mk_re(_IT_WEAK)
+from app.services.ti_classifier import counts as _ti_counts
 
 
 def _it_counts(b: PublicBid) -> tuple[int, int]:
-    text = f"{b.title or ''} {b.description or ''} {b.category_name or ''} {b.branch_name or ''}".lower()
-    strong = len({m.group(0).lower() for m in _IT_STRONG_RE.finditer(text)})
-    weak = len({m.group(0).lower() for m in _IT_WEAK_RE.finditer(text)})
-    return strong, weak
+    # relevância pré-calculada quando disponível; senão calcula na hora
+    return _ti_counts(b.title, b.description, b.category_name, b.branch_name)
 
 
 def _kw_hits(bid_text_folded: str, kw_list: list) -> list:
@@ -375,35 +342,28 @@ async def list_ti_bids(
     if hit is not None:
         return hit
 
-    stmt = select(PublicBid)
+    # Consulta indexada usando a relevância pré-calculada (is_ti / ti_score)
+    stmt = select(PublicBid).where(PublicBid.is_ti == True)  # noqa: E712
     stmt = _apply_filters(stmt, None, state, None, None, status, None,
                           min_value, max_value, None, None,
                           only_open_for_proposals, None)
-    stmt = stmt.limit(3000)  # candidatos; ranqueamento fino é feito em memória
+
+    total = (await session.execute(
+        select(func.count()).select_from(stmt.subquery())
+    )).scalar_one()
+
+    stmt = stmt.order_by(
+        PublicBid.ti_score.desc().nullslast(),
+        PublicBid.closing_date.asc().nullslast(),
+    ).offset((page - 1) * limit).limit(limit)
     rows = (await session.execute(stmt)).scalars().all()
-
-    scored = []
-    for b in rows:
-        strong, weak = _it_counts(b)
-        if strong >= 1:
-            scored.append((strong * 3 + weak, b))
-
-    scored.sort(key=lambda x: (
-        -x[0],
-        x[1].closing_date or date.max,
-        -float(x[1].estimated_value or 0),
-    ))
-
-    total = len(scored)
-    start = (page - 1) * limit
-    page_items = scored[start:start + limit]
 
     result = {
         "total": total,
         "page": page,
         "limit": limit,
         "pages": (total + limit - 1) // limit,
-        "data": [{**_bid_summary(b), "relevance": score} for score, b in page_items],
+        "data": [{**_bid_summary(b), "relevance": b.ti_score} for b in rows],
     }
     cache_set(ck, result, ttl=150)
     return result

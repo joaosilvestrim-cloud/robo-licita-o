@@ -6,6 +6,7 @@ import httpx
 from sqlmodel import select
 from app.db.models import PublicBid, ScrapeLog, BidStatus, BidSphere, BidModality, ScrapeStatus
 from app.database import AsyncSessionLocal
+from app.services.ti_classifier import classify as classify_ti
 
 logger = logging.getLogger(__name__)
 
@@ -96,11 +97,17 @@ def _map_bid(item: dict, source_key: str) -> dict:
     organ_name = orgao.get("razaoSocial") if isinstance(orgao, dict) else None
     organ_cnpj = orgao.get("cnpj") if isinstance(orgao, dict) else None
 
+    _title = (item.get("objetoCompra") or "")[:500]
+    _desc = item.get("informacaoComplementar") or item.get("objetoCompra")
+    _is_ti, _ti_score = classify_ti(_title, _desc)
+
     return {
         "external_id": external_id,
         "source": source_key,
-        "title": (item.get("objetoCompra") or "")[:500],
-        "description": item.get("informacaoComplementar") or item.get("objetoCompra"),
+        "title": _title,
+        "description": _desc,
+        "is_ti": _is_ti,
+        "ti_score": _ti_score,
         "sphere": sphere,
         "state": state,
         "city": city,
@@ -320,3 +327,23 @@ async def sync_pncp_proposta(days_ahead: int = 60, max_pages: int = 12):
     await update_source_status("pncp", log.status, inserted + updated)
     logger.info(f"PNCP proposta: found={found} inserted={inserted} updated={updated}")
     return log
+
+
+async def reindex_ti() -> int:
+    """Backfill: calcula is_ti/ti_score para licitações que ainda não têm."""
+    updated = 0
+    async with AsyncSessionLocal() as session:
+        while True:
+            rows = (await session.execute(
+                select(PublicBid).where(PublicBid.ti_score == None).limit(500)  # noqa: E711
+            )).scalars().all()
+            if not rows:
+                break
+            for b in rows:
+                is_ti, score = classify_ti(b.title, b.description, b.category_name, b.branch_name)
+                b.is_ti = is_ti
+                b.ti_score = score
+                updated += 1
+            await session.commit()
+    logger.info(f"reindex_ti: {updated} licitações reclassificadas")
+    return updated
