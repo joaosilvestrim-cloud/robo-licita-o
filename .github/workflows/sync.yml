@@ -14,6 +14,7 @@ on:
     - cron: "30 */8 * * *"  # a cada 8 horas   -> ComprasNet federal
     - cron: "0 3,15 * * *"  # 2x ao dia        -> Querido Diario + keywords dos perfis
     - cron: "0 2 * * *"     # diario as 02h    -> encerra licitacoes com prazo vencido
+    - cron: "45 */8 * * *"  # a cada 8 horas   -> PNCP proposta aberta (pool de oportunidades)
   workflow_dispatch:
     inputs:
       source:
@@ -63,6 +64,8 @@ jobs:
             call "keywords"
           elif [ "$SCHEDULE" = "0 2 * * *" ]; then
             call "close-expired"
+          elif [ "$SCHEDULE" = "45 */8 * * *" ]; then
+            call "pncp_proposta"
           else
             call "pncp" "3"
           fi

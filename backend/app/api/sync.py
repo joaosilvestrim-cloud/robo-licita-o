@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.db.models import ScrapeLog, User
 from app.auth import get_current_user, require_user_or_cron
-from app.services.pncp import sync_pncp
+from app.services.pncp import sync_pncp, sync_pncp_proposta
 from app.services.pncp_search import sync_keyword, sync_all_profile_keywords
 from app.services.alerts import process_alerts
 from app.services.comprasnet import sync_comprasnet
@@ -34,11 +34,12 @@ async def trigger_full_sync(
     """Sincroniza licitações por data (PNCP) + keywords dos perfis + processa alertas."""
     async def _run():
         await sync_pncp(days_back=days_back)
+        await sync_pncp_proposta()          # traz tudo que ainda aceita proposta
         await sync_all_profile_keywords()
         await process_alerts()
 
     background_tasks.add_task(_run)
-    return {"message": f"Sincronização completa iniciada (últimos {days_back} dias + keywords dos perfis)"}
+    return {"message": f"Sincronização completa iniciada (últimos {days_back} dias + propostas abertas + keywords)"}
 
 
 class KeywordSearchBody(BaseModel):
@@ -116,6 +117,7 @@ async def trigger_source_sync(
 ):
     SOURCE_MAP = {
         "pncp":        (sync_pncp,           {"days_back": days_back}),
+        "pncp_proposta": (sync_pncp_proposta, {}),
         "comprasnet":  (sync_comprasnet,      {"days_back": days_back}),
         "bec_sp":      (sync_bec_sp,          {"days_back": days_back}),
         "licitacoes_e":(sync_licitacoes_e,      {"days_back": days_back}),

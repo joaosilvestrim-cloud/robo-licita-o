@@ -229,3 +229,94 @@ async def sync_pncp(days_back: int = 1):
     await update_source_status("pncp", log.status, inserted + updated)
     logger.info(f"PNCP sync: found={found} inserted={inserted} updated={updated} status={log.status}")
     return log
+
+
+async def sync_pncp_proposta(days_ahead: int = 60, max_pages: int = 12):
+    """Sincroniza licitações com PROPOSTA AINDA ABERTA (endpoint /contratacoes/proposta).
+
+    Diferente do sync por data de publicação, este traz tudo que ainda aceita
+    proposta (encerramento até hoje+days_ahead), independentemente de quando foi
+    publicado. É o que garante um pool amplo de oportunidades acionáveis.
+    """
+    start_time = datetime.utcnow()
+    log = ScrapeLog(source="pncp", start_time=start_time)
+    inserted = updated = found = 0
+    try:
+        date_final = (date.today() + timedelta(days=days_ahead)).strftime("%Y%m%d")
+        async with httpx.AsyncClient(timeout=30) as client:
+            for modality_id in PNCP_MODALITIES:
+                page = 1
+                while page <= max_pages:
+                    try:
+                        resp = await client.get(
+                            f"{PNCP_BASE}/contratacoes/proposta",
+                            params={
+                                "dataFinal": date_final,
+                                "codigoModalidadeContratacao": modality_id,
+                                "pagina": page,
+                                "tamanhoPagina": 50,
+                            },
+                            headers={"Accept": "application/json"},
+                        )
+                        if resp.status_code in (400, 404, 204):
+                            break
+                        resp.raise_for_status()
+                        data = resp.json()
+                    except Exception as e:
+                        logger.warning(f"proposta mod {modality_id} pag {page}: {e}")
+                        break
+
+                    items = data.get("data", [])
+                    if not items:
+                        break
+                    found += len(items)
+
+                    async with AsyncSessionLocal() as session:
+                        for item in items:
+                            bid_data = _map_bid(item, "pncp")
+                            external_id = bid_data["external_id"]
+                            if not external_id:
+                                continue
+                            closing = bid_data.get("closing_date")
+                            if closing and closing < date.today():
+                                continue
+                            result = await session.execute(
+                                select(PublicBid).where(
+                                    PublicBid.source == "pncp",
+                                    PublicBid.external_id == external_id,
+                                )
+                            )
+                            existing = result.scalar_one_or_none()
+                            if existing:
+                                for k, v in bid_data.items():
+                                    if k not in ("external_id", "source", "created_at"):
+                                        setattr(existing, k, v)
+                                updated += 1
+                            else:
+                                session.add(PublicBid(**bid_data, created_at=datetime.utcnow()))
+                                inserted += 1
+                        await session.commit()
+
+                    total_pages = data.get("totalPaginas", 1) or 1
+                    if page >= min(total_pages, max_pages):
+                        break
+                    page += 1
+
+        log.status = ScrapeStatus.sucesso
+    except Exception as e:
+        logger.exception("Erro ao sincronizar PNCP proposta")
+        log.status = ScrapeStatus.erro
+        log.error_message = str(e)[:500]
+
+    log.end_time = datetime.utcnow()
+    log.records_found = found
+    log.records_inserted = inserted
+    log.records_updated = updated
+    async with AsyncSessionLocal() as session:
+        session.add(log)
+        await session.commit()
+
+    from app.services.source_tracker import update_source_status
+    await update_source_status("pncp", log.status, inserted + updated)
+    logger.info(f"PNCP proposta: found={found} inserted={inserted} updated={updated}")
+    return log
