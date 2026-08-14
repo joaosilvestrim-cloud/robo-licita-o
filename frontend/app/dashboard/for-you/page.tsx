@@ -70,7 +70,7 @@ export default function ForYouPage() {
           <p className="text-xs mt-1">Adicione palavras-chave ao seu perfil ou sincronize no Dashboard.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 dd-stagger">
           {items.map((b, i) => (
             <Link key={b.id} href={`/dashboard/bids/${b.id}`}
               className="block bg-white rounded-2xl border border-slate-100 shadow-card p-5 hover:shadow-card-hover hover:border-proc-200 transition group">

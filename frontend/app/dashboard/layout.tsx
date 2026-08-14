@@ -9,16 +9,24 @@ import {
 import ChatWidget from "../components/ChatWidget";
 import { Logo } from "../components/Logo";
 
-const nav = [
-  { href: "/dashboard",              label: "Dashboard",      icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/for-you",      label: "Pra você",       icon: Sparkles },
-  { href: "/dashboard/bids",         label: "Licitações",     icon: FileSearch },
-  { href: "/dashboard/alerts",       label: "Alertas",        icon: Bell },
-  { href: "/dashboard/profiles",     label: "Meus Perfis",    icon: Target },
-  { href: "/dashboard/tracking",     label: "Acompanhando",   icon: BookmarkCheck },
-  { href: "/dashboard/reports",      label: "Relatórios",     icon: BarChart2 },
-  { href: "/dashboard/company",      label: "Minha Empresa",  icon: Building2 },
-  { href: "/dashboard/sources",      label: "Fontes de Dados", icon: Database },
+const navGroups = [
+  { title: null, items: [
+    { href: "/dashboard",          label: "Dashboard", icon: LayoutDashboard, exact: true },
+    { href: "/dashboard/for-you",  label: "Pra você",  icon: Sparkles },
+  ]},
+  { title: "Oportunidades", items: [
+    { href: "/dashboard/bids",     label: "Licitações", icon: FileSearch },
+    { href: "/dashboard/alerts",   label: "Alertas",    icon: Bell },
+  ]},
+  { title: "Minha gestão", items: [
+    { href: "/dashboard/profiles", label: "Meus Perfis",   icon: Target },
+    { href: "/dashboard/tracking", label: "Acompanhando",  icon: BookmarkCheck },
+    { href: "/dashboard/reports",  label: "Relatórios",    icon: BarChart2 },
+  ]},
+  { title: "Conta", items: [
+    { href: "/dashboard/company",  label: "Minha Empresa",   icon: Building2 },
+    { href: "/dashboard/sources",  label: "Fontes de Dados", icon: Database },
+  ]},
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -70,10 +78,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const initial = userName.charAt(0).toUpperCase();
 
-  // Área de Usuários só para o Admin da empresa
-  const navItems = role === "admin"
-    ? [...nav, { href: "/dashboard/users", label: "Usuários", icon: Users }]
-    : nav;
+  // Área de Usuários só para o Admin da empresa (entra no grupo "Conta")
+  const groups = navGroups.map(g =>
+    g.title === "Conta" && role === "admin"
+      ? { ...g, items: [...g.items, { href: "/dashboard/users", label: "Usuários", icon: Users }] }
+      : g
+  );
 
   function isActive(item: { href: string; exact?: boolean }) {
     return item.exact ? pathname === item.href : pathname.startsWith(item.href);
@@ -101,27 +111,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {navItems.map(item => {
-            const active = isActive(item);
-            return (
-              <Link key={item.href} href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition group ${
-                  active
-                    ? "bg-proc-500 text-white font-medium"
-                    : "text-white/60 hover:text-white hover:bg-white/5"
-                }`}>
-                <item.icon size={16} className={active ? "text-white" : "text-white/50 group-hover:text-white/80"} />
-                <span className="flex-1">{item.label}</span>
-                {item.label === "Alertas" && newAlerts > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
-                    {newAlerts}
-                  </span>
-                )}
-                {active && <ChevronRight size={14} className="opacity-60" />}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-3 py-4 overflow-y-auto">
+          {groups.map((group, gi) => (
+            <div key={gi} className={gi > 0 ? "mt-5" : ""}>
+              {group.title && (
+                <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/25">
+                  {group.title}
+                </div>
+              )}
+              <div className="space-y-0.5">
+                {group.items.map(item => {
+                  const active = isActive(item);
+                  return (
+                    <Link key={item.href} href={item.href}
+                      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 group ${
+                        active
+                          ? "text-white font-semibold bg-white/[0.07]"
+                          : "text-white/55 hover:text-white hover:bg-white/[0.04] hover:translate-x-0.5"
+                      }`}>
+                      {active && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full dd-gradient" />
+                      )}
+                      <item.icon
+                        size={17}
+                        className={`shrink-0 transition-transform duration-200 ${
+                          active ? "text-proc-300" : "text-white/45 group-hover:text-white/85 group-hover:scale-110"
+                        }`}
+                      />
+                      <span className="flex-1">{item.label}</span>
+                      {item.label === "Alertas" && newAlerts > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center dd-pop">
+                          {newAlerts}
+                        </span>
+                      )}
+                      {active && <ChevronRight size={14} className="text-white/40" />}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* User */}
@@ -143,7 +172,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main — rola por padrão; páginas com layout próprio (bids/detalhe) usam h-screen internamente */}
       <main className="ml-60 flex-1 h-screen overflow-y-auto">
-        {children}
+        <div key={pathname} className="dd-page">{children}</div>
       </main>
 
       <ChatWidget />

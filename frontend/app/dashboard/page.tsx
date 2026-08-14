@@ -149,7 +149,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8 dd-stagger">
         {kpis.map(k => (
           <div key={k.label} className={`bg-white rounded-2xl shadow-card p-5 border border-slate-100 ${k.href ? "cursor-pointer hover:shadow-card-hover transition" : ""}`}
             onClick={() => k.href && (window.location.href = k.href)}>

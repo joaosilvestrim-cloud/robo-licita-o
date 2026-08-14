@@ -21,3 +21,38 @@ body {
   background-clip: text;
   color: transparent;
 }
+
+/* ── Animações do sistema ─────────────────────────────────────────── */
+@keyframes dd-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dd-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes dd-pop { 0% { transform: scale(.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes dd-shimmer { 100% { background-position: 200% 0; } }
+
+/* transição de página (só opacidade — sem mexer no layout) */
+.dd-page { animation: dd-fade-in .25s ease both; }
+/* entrada de cartões/listas */
+.dd-up { animation: dd-fade-up .4s cubic-bezier(.2,.7,.3,1) both; }
+.dd-pop { animation: dd-pop .25s cubic-bezier(.2,.8,.3,1.2) both; }
+
+/* stagger: aplica delay crescente aos filhos diretos */
+.dd-stagger > * { animation: dd-fade-up .45s cubic-bezier(.2,.7,.3,1) both; }
+.dd-stagger > *:nth-child(1) { animation-delay: .02s; }
+.dd-stagger > *:nth-child(2) { animation-delay: .06s; }
+.dd-stagger > *:nth-child(3) { animation-delay: .10s; }
+.dd-stagger > *:nth-child(4) { animation-delay: .14s; }
+.dd-stagger > *:nth-child(5) { animation-delay: .18s; }
+.dd-stagger > *:nth-child(6) { animation-delay: .22s; }
+.dd-stagger > *:nth-child(7) { animation-delay: .26s; }
+.dd-stagger > *:nth-child(8) { animation-delay: .30s; }
+
+/* skeleton shimmer para carregamentos */
+.dd-skeleton {
+  background: linear-gradient(90deg, #e8eef2 25%, #f3f7f9 37%, #e8eef2 63%);
+  background-size: 200% 100%;
+  animation: dd-shimmer 1.3s ease infinite;
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dd-page, .dd-up, .dd-pop, .dd-stagger > *, .dd-skeleton { animation: none !important; }
+}
