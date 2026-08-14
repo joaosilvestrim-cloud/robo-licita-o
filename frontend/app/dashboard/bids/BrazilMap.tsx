@@ -23,6 +23,23 @@ const CENTROIDS: Record<string, [number, number]> = {
   SE: [-37.4, -10.6], SP: [-48.5, -22.2], TO: [-48.3, -10.2],
 };
 
+const STATE_NAME: Record<string, string> = {
+  AC: "Acre", AL: "Alagoas", AM: "Amazonas", AP: "Amapá", BA: "Bahia",
+  CE: "Ceará", DF: "Distrito Federal", ES: "Espírito Santo", GO: "Goiás",
+  MA: "Maranhão", MG: "Minas Gerais", MS: "Mato Grosso do Sul", MT: "Mato Grosso",
+  PA: "Pará", PB: "Paraíba", PE: "Pernambuco", PI: "Piauí", PR: "Paraná",
+  RJ: "Rio de Janeiro", RN: "Rio Grande do Norte", RO: "Rondônia", RR: "Roraima",
+  RS: "Rio Grande do Sul", SC: "Santa Catarina", SE: "Sergipe", SP: "São Paulo", TO: "Tocantins",
+};
+const STATE_REGION: Record<string, string> = {
+  AC: "Norte", AP: "Norte", AM: "Norte", PA: "Norte", RO: "Norte", RR: "Norte", TO: "Norte",
+  AL: "Nordeste", BA: "Nordeste", CE: "Nordeste", MA: "Nordeste", PB: "Nordeste",
+  PE: "Nordeste", PI: "Nordeste", RN: "Nordeste", SE: "Nordeste",
+  DF: "Centro-Oeste", GO: "Centro-Oeste", MT: "Centro-Oeste", MS: "Centro-Oeste",
+  ES: "Sudeste", MG: "Sudeste", RJ: "Sudeste", SP: "Sudeste",
+  PR: "Sul", RS: "Sul", SC: "Sul",
+};
+
 // Gradiente azul → laranja → vermelho
 const HEAT_STOPS: [number, [number, number, number]][] = [
   [0.00, [219, 234, 254]],
@@ -102,6 +119,23 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
   const maxCityCount = Math.max(...cityPoints.map(c => c.count), 1);
   const maxCityVal   = Math.max(...cityPoints.map(c => c.total_value), 1);
 
+  // ── Insights (descrição dinâmica do mapa) ──────────────────────────
+  const totalBids  = stateStats.reduce((a, s) => a + s.count, 0);
+  const totalValue = stateStats.reduce((a, s) => a + s.total_value, 0);
+  const sorted     = [...stateStats].sort((a, b) => b.count - a.count);
+  const leader     = sorted[0];
+  const regionCount: Record<string, number> = {};
+  for (const s of stateStats) {
+    const reg = STATE_REGION[s.state];
+    if (reg) regionCount[reg] = (regionCount[reg] || 0) + s.count;
+  }
+  const topRegionEntry = Object.entries(regionCount).sort((a, b) => b[1] - a[1])[0];
+  const topRegion    = topRegionEntry?.[0];
+  const topRegionPct = topRegionEntry && totalBids ? Math.round((topRegionEntry[1] / totalBids) * 100) : 0;
+  const selStat = selectedState ? stateMap[selectedState] : null;
+  const selRank = selectedState ? sorted.findIndex(s => s.state === selectedState) + 1 : 0;
+  const selPct  = selStat && totalBids ? Math.round((selStat.count / totalBids) * 100) : 0;
+
   const handleStateClick = useCallback((code: string) => {
     if (selectedState === code) {
       onStateSelect(null);
@@ -123,18 +157,27 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
     <div className="flex flex-col h-full bg-white border-r border-slate-200">
       {/* Header */}
       <div className="px-4 py-3 border-b border-slate-100 shrink-0">
-        <h2 className="font-semibold text-slate-800 text-sm">Mapa de Calor</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full dd-gradient inline-block" /> Mapa de Calor
+          </h2>
+          {!selectedState && totalBids > 0 && (
+            <span className="text-[11px] font-medium text-slate-400 tabular-nums">
+              {totalBids.toLocaleString("pt-BR")} · {fmtM(totalValue)}
+            </span>
+          )}
+        </div>
         <p className="text-[11px] text-slate-400 mt-0.5">
           {selectedState
             ? cityLoading
-              ? `Carregando cidades de ${selectedState}…`
-              : `${selectedState} — ${cityPoints.length} cidades com licitações · clique novamente para voltar`
-            : "Clique em um estado para ver cidades"}
+              ? `Carregando cidades de ${STATE_NAME[selectedState] ?? selectedState}…`
+              : `${STATE_NAME[selectedState] ?? selectedState} — ${cityPoints.length} cidades · clique de novo p/ voltar`
+            : "Clique em um estado para ver as cidades"}
         </p>
       </div>
 
       {/* Map */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative overflow-hidden dd-fade">
         {(loading || cityLoading) && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/70 z-10">
             <span className="w-6 h-6 border-4 border-proc-200 border-t-proc-500 rounded-full animate-spin" />
@@ -230,9 +273,16 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
               const r       = baseR / position.zoom;
               const fill    = heatColor(city.count, maxCityCount);
               const isSelCity = selectedCity === city.city;
+              const isHot   = city.count >= maxCityCount * 0.6;  // hotspots pulsam
 
               return (
                 <Marker key={city.city_code} coordinates={[city.lng, city.lat]}>
+                  {isHot && (
+                    <circle r={r} fill={fill} opacity={0.45} style={{ pointerEvents: "none" }}>
+                      <animate attributeName="r" values={`${r};${r * 2.6};${r}`} dur="2.2s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.45;0;0.45" dur="2.2s" repeatCount="indefinite" />
+                    </circle>
+                  )}
                   <circle
                     r={r}
                     fill={isSelCity ? "#1d4ed8" : fill}
@@ -279,6 +329,47 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
           <span>Muitas</span>
         </div>
         <div className="h-2 rounded-full bg-gradient-to-r from-[#dbeafe] via-[#fb923c] to-[#dc2626]" />
+
+        {/* Descrição dinâmica */}
+        {!selectedState ? (
+          totalBids > 0 && (
+            <div className="dd-fade space-y-2 pt-1">
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                🔥 <b className="text-slate-700">{leader ? (STATE_NAME[leader.state] ?? leader.state) : ""}</b> lidera com <b>{leader?.count}</b> licitações.
+                {topRegion && <> A região <b className="text-slate-700">{topRegion}</b> concentra <b>{topRegionPct}%</b> das oportunidades.</>}
+              </p>
+              <div className="space-y-1.5">
+                {sorted.slice(0, 3).map((s, i) => (
+                  <div key={s.state} className="flex items-center gap-2">
+                    <button onClick={() => handleStateClick(s.state)}
+                      className="text-[11px] font-semibold text-slate-500 w-7 text-left hover:text-proc-600 shrink-0">
+                      {s.state}
+                    </button>
+                    <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full rounded-full dd-gradient"
+                        style={{ width: `${Math.max(6, Math.round((s.count / maxCount) * 100))}%` }} />
+                    </div>
+                    <span className="text-[10px] text-slate-400 w-9 text-right tabular-nums shrink-0">{s.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        ) : selStat ? (
+          <div className="dd-fade bg-slate-50 border border-slate-100 rounded-xl p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-800 truncate">{STATE_NAME[selectedState] ?? selectedState}</span>
+              {selRank > 0 && (
+                <span className="text-[10px] font-semibold text-white dd-gradient px-2 py-0.5 rounded-full shrink-0">
+                  {selRank}º no país
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              <b className="text-slate-700">{selStat.count}</b> licitações · <b>{selPct}%</b> do país · <b>{fmtM(selStat.total_value)}</b> em jogo
+            </p>
+          </div>
+        ) : null}
 
         {/* Top cidades */}
         {selectedState && cityPoints.length > 0 && (
