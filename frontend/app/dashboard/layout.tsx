@@ -36,8 +36,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setTenantName(localStorage.getItem("proc_tenant_name") || "");
     setRole(localStorage.getItem("proc_user_role") || "");
 
-    // Busca contagem de alertas novos
     const api = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+    // Nome da empresa/perfil sempre fresco (evita cache antigo no localStorage)
+    fetch(`${api}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        setTenantName(d.tenant_name || "");
+        setUserName(d.name || "Usuário");
+        setRole(d.role || "");
+        localStorage.setItem("proc_tenant_name", d.tenant_name || "");
+        localStorage.setItem("proc_user_role", d.role || "");
+        localStorage.setItem("proc_user_name", d.name || "");
+      })
+      .catch(() => {});
+
+    // Busca contagem de alertas novos
     fetch(`${api}/api/alerts/summary`, {
       headers: { Authorization: `Bearer ${token}` },
     })
