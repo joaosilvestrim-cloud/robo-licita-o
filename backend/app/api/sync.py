@@ -97,6 +97,16 @@ async def trigger_all_sources(
     return {"message": f"Sync de todas as fontes iniciado (últimos {days_back} dias)"}
 
 
+@router.post("/close-expired")
+async def close_expired(_: User = Depends(require_user_or_cron)):
+    """Encerra licitações cujo prazo (closing_date) já venceu e limpa alertas
+    obsoletos. Rodado pelo cron diário — mantém o status correto."""
+    from app.services.cleanup import close_expired_bids, delete_expired_alerts
+    closed = await close_expired_bids()
+    alerts_removed = await delete_expired_alerts()
+    return {"closed": closed, "alerts_removed": alerts_removed}
+
+
 @router.post("/{source}")
 async def trigger_source_sync(
     source: str,
