@@ -1,8 +1,11 @@
+import logging
 import re
 import ssl
 from urllib.parse import urlsplit, urlunsplit, parse_qsl
 
 from sqlmodel import SQLModel
+
+_log = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.config import settings
@@ -78,44 +81,43 @@ async def init_db():
     from app.db import models  # noqa: F401 — ensure models are registered
     from sqlalchemy import text
     schema = _safe_schema(settings.db_schema)
+    # 1) schema + tabelas (create_all só cria o que falta; não altera existentes)
     async with engine.begin() as conn:
-        # cria o schema isolado antes de tudo (search_path já aponta pra ele)
         if schema != "public":
             await conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
         await conn.run_sync(SQLModel.metadata.create_all)
 
-        # ── Migrations incrementais ────────────────────────────────────────────
-        # role em proc_users (existentes viram admin)
-        await conn.execute(text(
-            "ALTER TABLE proc_users ADD COLUMN IF NOT EXISTS role VARCHAR(10) NOT NULL DEFAULT 'admin'"
-        ))
-        # índice único em bid_interactions (user × bid)
-        await conn.execute(text(
-            "CREATE UNIQUE INDEX IF NOT EXISTS uq_bid_interactions_user_bid "
-            "ON bid_interactions(user_id, bid_id)"
-        ))
-        # índice único em public_bids (source × external_id) — evita duplicidade de licitação
-        await conn.execute(text(
-            "CREATE UNIQUE INDEX IF NOT EXISTS uq_public_bids_source_external "
-            "ON public_bids(source, external_id)"
-        ))
-        # Classificação TI & Dados pré-calculada (colunas + índice)
-        await conn.execute(text("ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS is_ti BOOLEAN"))
-        await conn.execute(text("ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS ti_score INTEGER"))
-        # ── Índices de performance para busca/filtros em public_bids ──────────
-        for idx_sql in [
-            "CREATE INDEX IF NOT EXISTS ix_bids_ti          ON public_bids(is_ti, ti_score)",
-            "CREATE INDEX IF NOT EXISTS ix_bids_status        ON public_bids(status)",
-            "CREATE INDEX IF NOT EXISTS ix_bids_state         ON public_bids(state)",
-            "CREATE INDEX IF NOT EXISTS ix_bids_sphere        ON public_bids(sphere)",
-            "CREATE INDEX IF NOT EXISTS ix_bids_modality      ON public_bids(modality)",
-            "CREATE INDEX IF NOT EXISTS ix_bids_closing       ON public_bids(closing_date)",
-            "CREATE INDEX IF NOT EXISTS ix_bids_estvalue      ON public_bids(estimated_value)",
-            "CREATE INDEX IF NOT EXISTS ix_bids_source        ON public_bids(source)",
-            # composto para a consulta mais comum: abertas com prazo válido
-            "CREATE INDEX IF NOT EXISTS ix_bids_status_closing ON public_bids(status, closing_date)",
-        ]:
-            await conn.execute(text(idx_sql))
+    # 2) migrações DDL — cada uma em transação própria, com lock_timeout curto e
+    #    tolerante a erro. No deploy zero-downtime a instância antiga segue lendo
+    #    as tabelas; um ALTER esperaria o lock e estouraria o statement_timeout,
+    #    derrubando o start. Assim o backend sobe mesmo se uma migração não puder
+    #    aplicar agora (ela reaplica no próximo restart).
+    _ddl = [
+        "ALTER TABLE proc_users ADD COLUMN IF NOT EXISTS role VARCHAR(10) NOT NULL DEFAULT 'admin'",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_bid_interactions_user_bid ON bid_interactions(user_id, bid_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_public_bids_source_external ON public_bids(source, external_id)",
+        "ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS is_ti BOOLEAN",
+        "ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS ti_score INTEGER",
+        "CREATE INDEX IF NOT EXISTS ix_bids_ti ON public_bids(is_ti, ti_score)",
+        "CREATE INDEX IF NOT EXISTS ix_bids_status ON public_bids(status)",
+        "CREATE INDEX IF NOT EXISTS ix_bids_state ON public_bids(state)",
+        "CREATE INDEX IF NOT EXISTS ix_bids_sphere ON public_bids(sphere)",
+        "CREATE INDEX IF NOT EXISTS ix_bids_modality ON public_bids(modality)",
+        "CREATE INDEX IF NOT EXISTS ix_bids_closing ON public_bids(closing_date)",
+        "CREATE INDEX IF NOT EXISTS ix_bids_estvalue ON public_bids(estimated_value)",
+        "CREATE INDEX IF NOT EXISTS ix_bids_source ON public_bids(source)",
+        "CREATE INDEX IF NOT EXISTS ix_bids_status_closing ON public_bids(status, closing_date)",
+    ]
+    for _sql in _ddl:
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text("SET LOCAL lock_timeout = '4s'"))
+                await conn.execute(text(_sql))
+        except Exception as _e:
+            _log.warning("init_db: migração adiada (%s): %s", _sql[:45], str(_e)[:120])
+
+    # 3) seeds idempotentes (INSERT ON CONFLICT — sem lock exclusivo de tabela)
+    async with engine.begin() as conn:
         # seed das fontes de dados
         await conn.execute(text("""
             INSERT INTO data_sources (key, name, description, official_url, active, created_at)
