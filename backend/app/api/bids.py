@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.db.models import PublicBid, BidStatus, BidSphere, BidModality, ObjectType, User, ProcurementProfile, Tenant
 from app.auth import get_current_user
+from app.services.cache import cache_get, cache_set
 
 router = APIRouter(prefix="/api/bids", tags=["bids"])
 
@@ -85,6 +86,11 @@ async def bid_geo_stats(
     _: User = Depends(get_current_user),
 ):
     """Agrega licitações por estado para o mapa de calor."""
+    ck = f"geo:{status}"
+    hit = cache_get(ck)
+    if hit is not None:
+        return hit
+
     stmt = select(PublicBid)
     if status:
         stmt = stmt.where(PublicBid.status == status)
@@ -102,12 +108,14 @@ async def bid_geo_stats(
         state_stats[key]["count"] += 1
         state_stats[key]["total_value"] += float(b.estimated_value or 0)
 
-    return {
+    result_data = {
         "states": [
             {"state": k, "count": v["count"], "total_value": round(v["total_value"], 2)}
             for k, v in sorted(state_stats.items(), key=lambda x: x[1]["count"], reverse=True)
         ]
     }
+    cache_set(ck, result_data, ttl=180)
+    return result_data
 
 
 def _apply_filters(stmt, sphere, state, city, branch, status, modality,
@@ -362,6 +370,11 @@ async def list_ti_bids(
     (software, sistema, dados, BI, cloud, ERP, etc.). A ordenação prioriza maior
     relevância, depois prazo mais próximo e maior valor.
     """
+    ck = f"ti:{state}:{status}:{min_value}:{max_value}:{only_open_for_proposals}:{page}:{limit}"
+    hit = cache_get(ck)
+    if hit is not None:
+        return hit
+
     stmt = select(PublicBid)
     stmt = _apply_filters(stmt, None, state, None, None, status, None,
                           min_value, max_value, None, None,
@@ -385,13 +398,15 @@ async def list_ti_bids(
     start = (page - 1) * limit
     page_items = scored[start:start + limit]
 
-    return {
+    result = {
         "total": total,
         "page": page,
         "limit": limit,
         "pages": (total + limit - 1) // limit,
         "data": [{**_bid_summary(b), "relevance": score} for score, b in page_items],
     }
+    cache_set(ck, result, ttl=150)
+    return result
 
 
 @router.get("/for-you")
@@ -404,6 +419,11 @@ async def bids_for_you(
     ordenadas por aderência (palavras-chave) e depois por prazo mais próximo.
     Sem perfil, cai no ranking de TI & Dados.
     """
+    ck = f"foryou:{user.tenant_id}:{limit}"
+    hit = cache_get(ck)
+    if hit is not None:
+        return hit
+
     profiles = (await session.execute(
         select(ProcurementProfile).where(
             ProcurementProfile.tenant_id == user.tenant_id,
@@ -447,7 +467,7 @@ async def bids_for_you(
     scored.sort(key=lambda x: (-x[0], x[1]))
     top = scored[:limit]
 
-    return {
+    result = {
         "total": len(scored),
         "has_profile": bool(profiles),
         "data": [
@@ -455,6 +475,8 @@ async def bids_for_you(
             for _, _, b, rel, dl, matched in top
         ],
     }
+    cache_set(ck, result, ttl=120)
+    return result
 
 
 @router.get("/{bid_id}")

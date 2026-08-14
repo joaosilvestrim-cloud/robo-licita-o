@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.db.models import PublicBid, BidTracking, ProcurementAlert, BidStatus, AlertStatus, User
 from app.auth import get_current_user
+from app.services.cache import cache_get, cache_set
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -14,6 +15,11 @@ async def get_dashboard(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
+    ck = f"dash:{user.tenant_id}"
+    hit = cache_get(ck)
+    if hit is not None:
+        return hit
+
     today = date.today()
     next_7d = today + timedelta(days=7)
 
@@ -76,7 +82,7 @@ async def get_dashboard(
     total_won = len([t for t in trackings if t.won])
     success_rate = round(total_won / total_tracking, 2) if total_tracking else 0
 
-    return {
+    result = {
         "total_bids_open": total_open,           # só as que ainda aceitam proposta
         "total_bids_coming_7d": len(coming_7d),
         "total_bids_no_deadline": len(no_deadline),
@@ -95,3 +101,5 @@ async def get_dashboard(
             "success_rate": success_rate,
         },
     }
+    cache_set(ck, result, ttl=90)
+    return result
