@@ -334,6 +334,16 @@ def _it_counts(b: PublicBid) -> tuple[int, int]:
     return strong, weak
 
 
+def _kw_hits(bid_text_folded: str, kw_list: list) -> list:
+    """Palavras da lista que aparecem no texto (match por palavra inteira)."""
+    hits = []
+    for k in kw_list:
+        fk = _fold_py(k)
+        if fk and _re.search(r"(?<!\w)" + _re.escape(fk) + r"(?!\w)", bid_text_folded):
+            hits.append(k)
+    return hits
+
+
 @router.get("/ti")
 async def list_ti_bids(
     state: Optional[str] = None,
@@ -381,6 +391,69 @@ async def list_ti_bids(
         "limit": limit,
         "pages": (total + limit - 1) // limit,
         "data": [{**_bid_summary(b), "relevance": score} for score, b in page_items],
+    }
+
+
+@router.get("/for-you")
+async def bids_for_you(
+    limit: int = Query(20, ge=1, le=50),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Feed 'Pra você': melhores oportunidades ABERTAS pro perfil da empresa,
+    ordenadas por aderência (palavras-chave) e depois por prazo mais próximo.
+    Sem perfil, cai no ranking de TI & Dados.
+    """
+    profiles = (await session.execute(
+        select(ProcurementProfile).where(
+            ProcurementProfile.tenant_id == user.tenant_id,
+            ProcurementProfile.active == True,  # noqa: E712
+        )
+    )).scalars().all()
+
+    kw_all, excl_all = [], []
+    for p in profiles:
+        kw_all += _split_csv(p.keywords) + _split_csv(p.preferred_branches)
+        excl_all += _split_csv(p.exclude_keywords)
+
+    # pool de licitações abertas (com prazo válido ou sem prazo)
+    stmt = select(PublicBid).where(
+        PublicBid.status == BidStatus.aberta,
+        or_(PublicBid.closing_date == None, PublicBid.closing_date >= date.today()),  # noqa: E711
+    ).limit(4000)
+    rows = (await session.execute(stmt)).scalars().all()
+
+    today = date.today()
+    scored = []
+    for b in rows:
+        text = _fold_py(f"{b.title or ''} {b.description or ''} {b.category_name or ''} {b.branch_name or ''}")
+        if excl_all and _kw_hits(text, excl_all):
+            continue
+        if kw_all:
+            hits = _kw_hits(text, kw_all)
+            if not hits:
+                continue
+            rel = len(hits) * 20
+            matched = hits[:3]
+        else:
+            s, w = _it_counts(b)
+            if s < 1:
+                continue
+            rel = s * 30 + w * 10
+            matched = ["TI & Dados"]
+        days_left = (b.closing_date - today).days if b.closing_date else None
+        scored.append((rel, days_left if days_left is not None else 9999, b, rel, days_left, matched))
+
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    top = scored[:limit]
+
+    return {
+        "total": len(scored),
+        "has_profile": bool(profiles),
+        "data": [
+            {**_bid_summary(b), "relevance": rel, "days_left": dl, "matched": matched}
+            for _, _, b, rel, dl, matched in top
+        ],
     }
 
 
