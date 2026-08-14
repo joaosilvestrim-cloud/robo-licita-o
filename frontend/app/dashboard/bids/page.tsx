@@ -63,9 +63,17 @@ const STATUS_OPTIONS = [
 const STATUS_BADGE: Record<string, string> = {
   aberta: "bg-emerald-100 text-emerald-700",
   andamento: "bg-blue-100 text-blue-700",
-  encerrada: "bg-slate-100 text-slate-600",
+  encerrada: "bg-slate-200 text-slate-500",
   cancelada: "bg-red-100 text-red-600",
   programada: "bg-amber-100 text-amber-700",
+};
+// Faixa colorida na lateral da linha, por categoria de status
+const STATUS_STRIPE: Record<string, string> = {
+  aberta: "border-l-emerald-400",
+  andamento: "border-l-blue-400",
+  programada: "border-l-amber-400",
+  encerrada: "border-l-slate-300",
+  cancelada: "border-l-red-300",
 };
 const SPHERE_LABELS: Record<string, string> = {
   federal: "Federal", estadual: "Estadual", municipal: "Municipal",
@@ -108,11 +116,14 @@ export default function BidsPage() {
   const pages = Math.ceil(total / limit);
 
   function toggleStatus(val: string) {
+    const adding = !selectedStatus.has(val);
     setSelectedStatus(prev => {
       const next = new Set(prev);
       next.has(val) ? next.delete(val) : next.add(val);
       return next;
     });
+    // Ao incluir um status não-aberto, libera o filtro de prazo para elas aparecerem
+    if (adding && val !== "aberta") setOnlyOpenForProposals(false);
     setPage(1);
   }
 
@@ -419,13 +430,19 @@ export default function BidsPage() {
                   {bids.map((bid: any) => (
                     <tr
                       key={bid.id}
-                      className="hover:bg-slate-50 transition group cursor-pointer"
+                      className={`transition group cursor-pointer ${
+                        bid.status === "encerrada" || bid.status === "cancelada"
+                          ? "bg-slate-50/80 hover:bg-slate-100"
+                          : "hover:bg-slate-50"
+                      }`}
                       onClick={() => setSelectedBidId(bid.id)}
                       onDoubleClick={() => router.push(`/dashboard/bids/${bid.id}`)}
                       title="Clique para prévia · Duplo clique para íntegra"
                     >
-                      <td className="px-4 py-3 max-w-[240px]">
-                        <div className="font-medium text-slate-900 line-clamp-2 text-xs leading-snug" title={bid.title}>
+                      <td className={`px-4 py-3 max-w-[240px] border-l-4 ${STATUS_STRIPE[bid.status] ?? "border-l-transparent"}`}>
+                        <div className={`font-medium line-clamp-2 text-xs leading-snug ${
+                          bid.status === "encerrada" || bid.status === "cancelada" ? "text-slate-400" : "text-slate-900"
+                        }`} title={bid.title}>
                           {bid.title}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
