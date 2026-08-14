@@ -8,8 +8,8 @@ import { useRouter } from "next/navigation";
 const BrazilMap = dynamic(() => import("./BrazilMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center h-full bg-white border-r border-slate-200">
-      <span className="w-7 h-7 border-4 border-proc-200 border-t-proc-500 rounded-full animate-spin" />
+    <div className="flex items-center justify-center h-full border-r border-slate-800" style={{ background: "#0a1f34" }}>
+      <span className="w-7 h-7 border-4 border-cyan-500/30 border-t-cyan-300 rounded-full animate-spin" />
     </div>
   ),
 });

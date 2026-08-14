@@ -40,16 +40,17 @@ const STATE_REGION: Record<string, string> = {
   PR: "Sul", RS: "Sul", SC: "Sul",
 };
 
-// Gradiente azul → laranja → vermelho
+// Escala "radar Sonar": fundo escuro → azul → ciano → verde (paleta da marca).
+// Mais licitações = mais aceso (verde brilhante).
 const HEAT_STOPS: [number, [number, number, number]][] = [
-  [0.00, [219, 234, 254]],
-  [0.25, [ 96, 165, 250]],
-  [0.55, [251, 146,  60]],
-  [1.00, [220,  38,  38]],
+  [0.00, [ 26,  55,  82]],   // navy quase apagado (poucas)
+  [0.30, [ 30, 134, 224]],   // azul
+  [0.62, [ 23, 182, 198]],   // ciano
+  [1.00, [ 76, 221, 132]],   // verde brilhante (hotspot)
 ];
 function lerp(a: number, b: number, t: number) { return Math.round(a + (b - a) * t); }
 function heatColor(count: number, max: number): string {
-  if (max === 0 || count === 0) return "#dbeafe";
+  if (max === 0 || count === 0) return "#14283d";
   const t = Math.min(count / max, 1);
   let i = 0;
   while (i < HEAT_STOPS.length - 2 && t > HEAT_STOPS[i + 1][0]) i++;
@@ -154,15 +155,16 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
   }
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-slate-200">
+    <div className="flex flex-col h-full text-slate-200 border-r border-slate-800"
+      style={{ background: "linear-gradient(180deg,#0c2740 0%,#0a1f34 60%,#081726 100%)" }}>
       {/* Header */}
-      <div className="px-4 py-3 border-b border-slate-100 shrink-0">
+      <div className="px-4 py-3 border-b border-white/10 shrink-0">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full dd-gradient inline-block" /> Mapa de Calor
+          <h2 className="font-semibold text-white text-sm flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full dd-gradient inline-block shadow-[0_0_8px_rgba(63,208,124,.8)]" /> Radar de Licitações
           </h2>
           {!selectedState && totalBids > 0 && (
-            <span className="text-[11px] font-medium text-slate-400 tabular-nums">
+            <span className="text-[11px] font-medium text-cyan-200/70 tabular-nums">
               {totalBids.toLocaleString("pt-BR")} · {fmtM(totalValue)}
             </span>
           )}
@@ -178,9 +180,13 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
 
       {/* Map */}
       <div className="flex-1 relative overflow-hidden dd-fade">
+        {/* brilho radial de fundo (radar) */}
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(circle at 50% 42%, rgba(23,182,198,0.12), transparent 62%)" }} />
+
         {(loading || cityLoading) && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/70 z-10">
-            <span className="w-6 h-6 border-4 border-proc-200 border-t-proc-500 rounded-full animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0a1f34]/60 z-10">
+            <span className="w-6 h-6 border-4 border-cyan-500/30 border-t-cyan-300 rounded-full animate-spin" />
           </div>
         )}
 
@@ -189,6 +195,12 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
           projectionConfig={{ scale: 750, center: [-54, -15] }}
           style={{ width: "100%", height: "100%" }}
         >
+          <defs>
+            <filter id="ddGlow" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="1.4" result="b" />
+              <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
           <ZoomableGroup
             zoom={position.zoom}
             center={position.coordinates}
@@ -225,25 +237,23 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
                       onMouseLeave={() => setTooltip(null)}
                       style={{
                         default: {
-                          fill: isSelected
-                            ? "#1e3a8a"
-                            : heatColor(count, maxCount),
-                          stroke: "#fff",
-                          strokeWidth: 0.4,
+                          fill: isSelected ? "#4cdd84" : heatColor(count, maxCount),
+                          stroke: "rgba(125,211,252,0.18)",
+                          strokeWidth: 0.5,
                           outline: "none",
                           cursor: "pointer",
-                          transition: "fill 0.2s",
-                          opacity: selectedState && !isSelected ? 0.45 : 1,
+                          transition: "fill 0.25s, opacity 0.25s",
+                          opacity: selectedState && !isSelected ? 0.32 : 1,
                         },
                         hover: {
-                          fill: isSelected ? "#1e40af" : "#93c5fd",
-                          stroke: "#fff",
-                          strokeWidth: 0.6,
+                          fill: isSelected ? "#5ce894" : "#2f6d94",
+                          stroke: "rgba(180,240,255,0.7)",
+                          strokeWidth: 0.9,
                           outline: "none",
                           cursor: "pointer",
                           opacity: 1,
                         },
-                        pressed: { fill: "#1e40af", outline: "none" },
+                        pressed: { fill: "#5ce894", outline: "none" },
                       }}
                     />
                   );
@@ -258,9 +268,10 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
                 <Marker key={s.state} coordinates={CENTROIDS[s.state]}>
                   <circle
                     r={r}
-                    fill="rgba(255,255,255,0.2)"
-                    stroke="rgba(255,255,255,0.6)"
-                    strokeWidth={0.5 / position.zoom}
+                    fill="rgba(76,221,132,0.10)"
+                    stroke="rgba(130,228,255,0.55)"
+                    strokeWidth={0.6 / position.zoom}
+                    filter="url(#ddGlow)"
                     style={{ pointerEvents: "none" }}
                   />
                 </Marker>
@@ -278,16 +289,17 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
               return (
                 <Marker key={city.city_code} coordinates={[city.lng, city.lat]}>
                   {isHot && (
-                    <circle r={r} fill={fill} opacity={0.45} style={{ pointerEvents: "none" }}>
-                      <animate attributeName="r" values={`${r};${r * 2.6};${r}`} dur="2.2s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" values="0.45;0;0.45" dur="2.2s" repeatCount="indefinite" />
+                    <circle r={r} fill={fill} opacity={0.5} filter="url(#ddGlow)" style={{ pointerEvents: "none" }}>
+                      <animate attributeName="r" values={`${r};${r * 2.8};${r}`} dur="2.2s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.5;0;0.5" dur="2.2s" repeatCount="indefinite" />
                     </circle>
                   )}
                   <circle
                     r={r}
-                    fill={isSelCity ? "#1d4ed8" : fill}
-                    stroke={isSelCity ? "#fff" : "rgba(255,255,255,0.8)"}
-                    strokeWidth={0.8 / position.zoom}
+                    fill={isSelCity ? "#4cdd84" : fill}
+                    stroke={isSelCity ? "#fff" : "rgba(180,240,255,0.85)"}
+                    strokeWidth={0.9 / position.zoom}
+                    filter="url(#ddGlow)"
                     style={{ cursor: "pointer" }}
                     onClick={() => onCitySelect(isSelCity ? null : city.city)}
                     onMouseEnter={evt => {
@@ -319,33 +331,33 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
         )}
       </div>
 
-      {/* Legenda */}
-      <div className="px-4 py-3 border-t border-slate-100 shrink-0 space-y-1.5">
+      {/* Legenda + descrição */}
+      <div className="px-4 py-3 border-t border-white/10 shrink-0 space-y-2">
         <div className="flex items-center justify-between text-[10px] text-slate-400">
           <span>Poucas</span>
-          <span className="font-medium text-slate-500">
-            {selectedState ? "Licitações por cidade" : "Licitações por estado"}
+          <span className="font-medium text-cyan-200/70">
+            {selectedState ? "Por cidade" : "Por estado"}
           </span>
           <span>Muitas</span>
         </div>
-        <div className="h-2 rounded-full bg-gradient-to-r from-[#dbeafe] via-[#fb923c] to-[#dc2626]" />
+        <div className="h-2 rounded-full bg-gradient-to-r from-[#14283d] via-[#17b6c6] to-[#4cdd84] shadow-[0_0_12px_rgba(76,221,132,.35)]" />
 
         {/* Descrição dinâmica */}
         {!selectedState ? (
           totalBids > 0 && (
             <div className="dd-fade space-y-2 pt-1">
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                🔥 <b className="text-slate-700">{leader ? (STATE_NAME[leader.state] ?? leader.state) : ""}</b> lidera com <b>{leader?.count}</b> licitações.
-                {topRegion && <> A região <b className="text-slate-700">{topRegion}</b> concentra <b>{topRegionPct}%</b> das oportunidades.</>}
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                🔥 <b className="text-white">{leader ? (STATE_NAME[leader.state] ?? leader.state) : ""}</b> lidera com <b className="text-cyan-200">{leader?.count}</b> licitações.
+                {topRegion && <> A região <b className="text-white">{topRegion}</b> concentra <b className="text-cyan-200">{topRegionPct}%</b>.</>}
               </p>
               <div className="space-y-1.5">
-                {sorted.slice(0, 3).map((s, i) => (
+                {sorted.slice(0, 3).map(s => (
                   <div key={s.state} className="flex items-center gap-2">
                     <button onClick={() => handleStateClick(s.state)}
-                      className="text-[11px] font-semibold text-slate-500 w-7 text-left hover:text-proc-600 shrink-0">
+                      className="text-[11px] font-semibold text-cyan-200/80 w-7 text-left hover:text-white shrink-0">
                       {s.state}
                     </button>
-                    <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
                       <div className="h-full rounded-full dd-gradient"
                         style={{ width: `${Math.max(6, Math.round((s.count / maxCount) * 100))}%` }} />
                     </div>
@@ -356,32 +368,32 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
             </div>
           )
         ) : selStat ? (
-          <div className="dd-fade bg-slate-50 border border-slate-100 rounded-xl p-2.5">
+          <div className="dd-fade bg-white/5 border border-white/10 rounded-xl p-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-slate-800 truncate">{STATE_NAME[selectedState] ?? selectedState}</span>
+              <span className="text-xs font-bold text-white truncate">{STATE_NAME[selectedState] ?? selectedState}</span>
               {selRank > 0 && (
                 <span className="text-[10px] font-semibold text-white dd-gradient px-2 py-0.5 rounded-full shrink-0">
                   {selRank}º no país
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              <b className="text-slate-700">{selStat.count}</b> licitações · <b>{selPct}%</b> do país · <b>{fmtM(selStat.total_value)}</b> em jogo
+            <p className="text-[11px] text-slate-300 mt-1">
+              <b className="text-cyan-200">{selStat.count}</b> licitações · <b className="text-white">{selPct}%</b> do país · <b className="text-white">{fmtM(selStat.total_value)}</b> em jogo
             </p>
           </div>
         ) : null}
 
         {/* Top cidades */}
         {selectedState && cityPoints.length > 0 && (
-          <div className="mt-2 space-y-1 max-h-28 overflow-y-auto">
+          <div className="mt-1 space-y-1 max-h-28 overflow-y-auto">
             {cityPoints.slice(0, 6).map(c => (
               <button
                 key={c.city_code}
                 onClick={() => onCitySelect(selectedCity === c.city ? null : c.city)}
                 className={`w-full flex items-center justify-between text-[11px] px-2 py-1 rounded-lg transition ${
                   selectedCity === c.city
-                    ? "bg-proc-100 text-proc-800 font-semibold"
-                    : "hover:bg-slate-50 text-slate-600"
+                    ? "bg-cyan-400/15 text-cyan-200 font-semibold"
+                    : "hover:bg-white/5 text-slate-300"
                 }`}
               >
                 <span className="truncate">{c.city}</span>
@@ -394,7 +406,7 @@ export default function BrazilMap({ token, selectedState, selectedCity, onStateS
         {(selectedState || selectedCity) && (
           <button
             onClick={() => { onStateSelect(null); onCitySelect(null); }}
-            className="w-full text-xs text-proc-600 hover:text-proc-800 font-medium py-1 px-2 bg-proc-50 hover:bg-proc-100 rounded-lg transition"
+            className="w-full text-xs text-cyan-300 hover:text-white font-medium py-1.5 px-2 bg-white/5 hover:bg-white/10 rounded-lg transition"
           >
             Limpar filtros ({[selectedState, selectedCity].filter(Boolean).join(" › ")})
           </button>
