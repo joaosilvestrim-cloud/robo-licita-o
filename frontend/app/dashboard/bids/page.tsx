@@ -92,6 +92,17 @@ export default function BidsPage() {
   const [selectedStatus, setSelectedStatus] = useState<Set<string>>(new Set(["aberta"]));
   const [onlyOpenForProposals, setOnlyOpenForProposals] = useState(true);
   const [itMode, setItMode]         = useState(false);
+  const [modality, setModality]     = useState("");
+  const [minValue, setMinValue]     = useState("");
+  const [maxValue, setMaxValue]     = useState("");
+  const [daysBefore, setDaysBefore] = useState("");
+
+  function clearAllFilters() {
+    setQ(""); setSphere(""); setState(""); setCity("");
+    setModality(""); setMinValue(""); setMaxValue(""); setDaysBefore("");
+    setSelectedStatus(new Set(["aberta"])); setOnlyOpenForProposals(true);
+    setPage(1);
+  }
 
   const limit = 20;
   const pages = Math.ceil(total / limit);
@@ -124,6 +135,10 @@ export default function BidsPage() {
     if (clean(sphere)) params.set("sphere", clean(sphere));
     if (clean(state))  params.set("state", clean(state).toUpperCase());
     if (clean(city))   params.set("city", clean(city));
+    if (clean(modality)) params.set("modality", clean(modality));
+    if (minValue)      params.set("min_value", minValue);
+    if (maxValue)      params.set("max_value", maxValue);
+    if (daysBefore)    params.set("days_before_closing", daysBefore);
     if (selectedStatus.size === 1) params.set("status", [...selectedStatus][0]);
     if (onlyOpenForProposals) params.set("only_open_for_proposals", "true");
 
@@ -141,7 +156,7 @@ export default function BidsPage() {
       setTotal(data.total ?? 0);
     } catch {}
     setLoading(false);
-  }, [page, q, sphere, state, city, sortBy, sortDir, selectedStatus, onlyOpenForProposals, itMode, token]);
+  }, [page, q, sphere, state, city, modality, minValue, maxValue, daysBefore, sortBy, sortDir, selectedStatus, onlyOpenForProposals, itMode, token]);
 
   function toggleSort(col: string) {
     if (sortBy === col) {
@@ -281,6 +296,36 @@ export default function BidsPage() {
 
             </div>
 
+            {/* Linha 1b: modalidade, faixa de valor, prazo */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <select value={modality} onChange={e => { setModality(e.target.value); setPage(1); }}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-proc-400">
+                <option value="">Todas modalidades</option>
+                <option value="pregao">Pregão</option>
+                <option value="concorrencia">Concorrência</option>
+                <option value="dispensa">Dispensa</option>
+                <option value="inexigibilidade">Inexigibilidade</option>
+                <option value="dialogo_competitivo">Diálogo Competitivo</option>
+                <option value="leilao">Leilão</option>
+              </select>
+              <input type="number" value={minValue} min="0" step="1000"
+                onChange={e => { setMinValue(e.target.value); setPage(1); }}
+                placeholder="Valor mín. (R$)"
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-proc-400" />
+              <input type="number" value={maxValue} min="0" step="1000"
+                onChange={e => { setMaxValue(e.target.value); setPage(1); }}
+                placeholder="Valor máx. (R$)"
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-proc-400" />
+              <select value={daysBefore} onChange={e => { setDaysBefore(e.target.value); setPage(1); }}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-proc-400">
+                <option value="">Qualquer prazo</option>
+                <option value="3">Vence em até 3 dias</option>
+                <option value="7">Vence em até 7 dias</option>
+                <option value="15">Vence em até 15 dias</option>
+                <option value="30">Vence em até 30 dias</option>
+              </select>
+            </div>
+
             {/* Linha 2: status flags */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Status:</span>
@@ -296,12 +341,10 @@ export default function BidsPage() {
                   </button>
                 );
               })}
-              {selectedStatus.size > 0 && (
-                <button onClick={() => { setSelectedStatus(new Set()); setPage(1); }}
-                  className="text-[10px] text-slate-400 hover:text-slate-600 flex items-center gap-0.5 transition ml-1">
-                  <X size={10} /> Limpar
-                </button>
-              )}
+              <button onClick={clearAllFilters}
+                className="text-[10px] text-slate-400 hover:text-proc-600 flex items-center gap-0.5 transition ml-1">
+                <X size={10} /> Limpar filtros
+              </button>
 
               {/* Toggle "ainda dá tempo" */}
               <label className="ml-auto flex items-center gap-1.5 cursor-pointer select-none">
