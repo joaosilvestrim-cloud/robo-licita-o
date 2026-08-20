@@ -140,14 +140,17 @@ export default function BidDetailPage() {
       .catch(() => {});
   }, [bid?.id, token]);
 
-  // inteligência de concorrência (quem venceu — só para encerradas/homologadas)
+  // inteligência de concorrência (quem venceu). Só chama o PNCP para encerradas —
+  // abertas só mostram o aviso de sigilo, sem custo de rede.
   useEffect(() => {
     if (!bid?.id || !token) return;
+    const isOpen = ["aberta", "andamento", "programada"].includes(bid.status);
+    if (isOpen) { setComp({ has_result: false }); return; }
     fetch(`${API}/api/bids/${bid.id}/competitors`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null)
       .then(d => setComp(d))
       .catch(() => {});
-  }, [bid?.id, token]);
+  }, [bid?.id, bid?.status, token]);
 
   async function startTracking() {
     setTracking(true);
