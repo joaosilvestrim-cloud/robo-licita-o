@@ -66,6 +66,8 @@ engine = create_async_engine(
     future=True,
     pool_pre_ping=True,          # revalida conexões (o backend pode dormir na Render)
     pool_recycle=1800,
+    pool_size=3,                 # gentil com o limite de conexões do pooler Supabase
+    max_overflow=2,
     connect_args=_connect_args(DATABASE_URL),
 )
 

@@ -24,8 +24,14 @@ scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing Procurement database...")
-    await init_db()
-    logger.info("Database initialized.")
+    # init_db NUNCA deve derrubar o start: se falhar (conexão, lock, timeout no
+    # pooler), o app sobe assim mesmo, o /health responde e o Render não entra em
+    # crash loop. As migrações são idempotentes e reaplicam no próximo restart.
+    try:
+        await init_db()
+        logger.info("Database initialized.")
+    except Exception as e:
+        logger.error("init_db falhou (app sobe mesmo assim): %s", e)
 
     # Agendador interno é opcional. Em cloud (Render + cron externo) fica desligado
     # via ENABLE_SCHEDULER=false, e os syncs são disparados por HTTP pelo cron.
