@@ -12,13 +12,13 @@ _IT_STRONG = [
     "tecnologia da informação", "informática", "banco de dados", "base de dados",
     "business intelligence", "power bi", "análise de dados", "ciência de dados",
     "big data", "data warehouse", "data lake", "data center", "datacenter",
-    "computação em nuvem", "cloud", "erp", "crm", "geoprocessamento", "sig ",
+    "computação em nuvem", "cloud", "erp", "crm", "geoprocessamento",
     "inteligência artificial", "machine learning", "aprendizado de máquina",
     "desenvolvimento de sistema", "desenvolvimento de software", "fábrica de software",
     "segurança da informação", "cibersegurança", "assinatura eletrônica",
     "certificado digital", "dashboard", "etl", "api", "governança de dados",
     "licença de software", "licenciamento de software", "sistema de gestão",
-    "portal web", "aplicativo", "aplicação web", "ti ", " ti",
+    "portal web", "aplicativo", "aplicação web", "ti",
 ]
 # Sinais FRACOS: reforçam relevância, mas só valem quando há pelo menos 1 forte.
 _IT_WEAK = [

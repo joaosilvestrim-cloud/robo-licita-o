@@ -68,7 +68,7 @@ def _map(item: dict) -> Optional[dict]:
     }
 
 
-async def sync_contratos(days_back: int = 120, max_pages: int = 15):
+async def sync_contratos(days_back: int = 180, max_pages: int = 20):
     """Sincroniza contratos de TI publicados nos últimos N dias e ainda vigentes."""
     start = datetime.utcnow()
     log = ScrapeLog(source="pncp_contratos", start_time=start)
