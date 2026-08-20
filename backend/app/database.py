@@ -109,6 +109,8 @@ async def init_db():
         "CREATE INDEX IF NOT EXISTS ix_bids_estvalue ON public_bids(estimated_value)",
         "CREATE INDEX IF NOT EXISTS ix_bids_source ON public_bids(source)",
         "CREATE INDEX IF NOT EXISTS ix_bids_status_closing ON public_bids(status, closing_date)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_contracts_external ON public_contracts(external_id)",
+        "CREATE INDEX IF NOT EXISTS ix_contracts_ti ON public_contracts(is_ti, vigencia_fim)",
     ]
     for _sql in _ddl:
         try:

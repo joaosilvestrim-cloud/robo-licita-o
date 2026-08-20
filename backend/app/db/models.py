@@ -446,3 +446,35 @@ class ChatMessage(SQLModel, table=True):
     role: str = Field(max_length=20)  # "user" or "assistant"
     content: str = Field(sa_column=Column(Text))
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ─── Contratos públicos (canal "recontratação de TI") ─────────────────────────
+
+class PublicContract(SQLModel, table=True):
+    __tablename__ = "public_contracts"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    external_id: str = Field(max_length=300)   # dedup: numeroControlePncpCompra::numeroContrato
+    source: str = Field(default="pncp", max_length=50)
+
+    objeto: str = Field(max_length=1000)
+    valor: Optional[Decimal] = Field(default=None, decimal_places=2, max_digits=15)
+
+    organ_name: Optional[str] = Field(default=None, max_length=255)
+    organ_cnpj: Optional[str] = Field(default=None, max_length=18)
+    sphere: Optional[str] = Field(default=None, max_length=20)
+    state: Optional[str] = Field(default=None, max_length=2)
+    city: Optional[str] = Field(default=None, max_length=255)
+
+    # incumbente (quem tem o contrato hoje)
+    supplier_name: Optional[str] = Field(default=None, max_length=255)
+    supplier_document: Optional[str] = Field(default=None, max_length=20)
+
+    vigencia_inicio: Optional[date] = Field(default=None)
+    vigencia_fim: Optional[date] = Field(default=None)   # o que dispara a recontratação
+
+    is_ti: Optional[bool] = Field(default=None)
+    ti_score: Optional[int] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

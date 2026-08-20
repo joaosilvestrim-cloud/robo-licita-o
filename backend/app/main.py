@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.config import settings
 from app.database import init_db
-from app.api import auth, bids, profiles, alerts, tracking, dashboard, sync, cnpj, chat, companies, interactions, users, sources, municipal_portals
+from app.api import auth, bids, profiles, alerts, tracking, dashboard, sync, cnpj, chat, companies, interactions, users, sources, municipal_portals, contracts
 from app.cron.jobs import (
     run_pncp_sync, run_comprasnet_sync, run_bec_sp_sync,
     run_licitacoes_e_sync, run_querido_diario_sync,
@@ -92,6 +92,7 @@ app.include_router(interactions.router)
 app.include_router(users.router)
 app.include_router(sources.router)
 app.include_router(municipal_portals.router)
+app.include_router(contracts.router)
 
 
 @app.get("/health")

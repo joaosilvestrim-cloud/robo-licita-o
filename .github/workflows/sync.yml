@@ -16,6 +16,7 @@ on:
     - cron: "0 2 * * *"     # diario as 02h    -> encerra licitacoes com prazo vencido
     - cron: "45 */8 * * *"  # a cada 8 horas   -> PNCP proposta aberta (pool de oportunidades)
     - cron: "0 11 * * *"    # diario 08h BRT   -> digest de oportunidades no Telegram
+    - cron: "30 5,17 * * *" # 2x ao dia        -> contratos de TI vencendo (recontratacao)
   workflow_dispatch:
     inputs:
       source:
@@ -69,6 +70,8 @@ jobs:
             call "pncp_proposta"
           elif [ "$SCHEDULE" = "0 11 * * *" ]; then
             call "digest"
+          elif [ "$SCHEDULE" = "30 5,17 * * *" ]; then
+            call "contratos"
           else
             call "pncp" "3"
           fi

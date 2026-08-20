@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, FileSearch, Bell, BookmarkCheck,
-  LogOut, ChevronRight, BarChart2, Target, Building2, Database, Users, Sparkles,
+  LogOut, ChevronRight, BarChart2, Target, Building2, Database, Users, Sparkles, FileClock,
 } from "lucide-react";
 import ChatWidget from "../components/ChatWidget";
 import { Logo } from "../components/Logo";
@@ -15,8 +15,9 @@ const navGroups = [
     { href: "/dashboard/for-you",  label: "Pra você",  icon: Sparkles },
   ]},
   { title: "Oportunidades", items: [
-    { href: "/dashboard/bids",     label: "Licitações", icon: FileSearch },
-    { href: "/dashboard/alerts",   label: "Alertas",    icon: Bell },
+    { href: "/dashboard/bids",      label: "Licitações", icon: FileSearch },
+    { href: "/dashboard/contracts", label: "Recontratação", icon: FileClock },
+    { href: "/dashboard/alerts",    label: "Alertas",    icon: Bell },
   ]},
   { title: "Minha gestão", items: [
     { href: "/dashboard/profiles", label: "Meus Perfis",   icon: Target },
