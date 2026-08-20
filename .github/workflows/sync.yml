@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       source:
-        description: "Fonte para sync manual (pncp, comprasnet, dou, keywords, alerts, all)"
+        description: "Fonte para sync manual (pncp, comprasnet, dou, contratos, fomento, keywords, alerts, all)"
         required: false
         default: "pncp"
       days_back:
