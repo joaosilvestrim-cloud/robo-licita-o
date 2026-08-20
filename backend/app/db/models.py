@@ -478,3 +478,29 @@ class PublicContract(SQLModel, table=True):
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class FundingOpportunity(SQLModel, table=True):
+    """Canal 'Fomento': editais/chamadas de agências de fomento (FAPESP etc.).
+    Onde mora a oportunidade para uma consultoria de dados/TI: programas de
+    inovação (PIPE) e chamadas com prazo de submissão abrindo agora."""
+    __tablename__ = "funding_opportunities"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    external_id: str = Field(max_length=300)   # dedup: source::codigo
+    source: str = Field(default="fapesp", max_length=50)
+    agency: Optional[str] = Field(default=None, max_length=80)   # FAPESP, FINEP, BNDES...
+
+    title: str = Field(max_length=600)
+    area: Optional[str] = Field(default=None, sa_column=Column(Text))
+    modality: Optional[str] = Field(default=None, max_length=300)
+    url: Optional[str] = Field(default=None, max_length=500)
+
+    deadline: Optional[date] = Field(default=None)   # data-limite de submissão
+    is_open: bool = Field(default=True)
+
+    is_ti: Optional[bool] = Field(default=None)
+    ti_score: Optional[int] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

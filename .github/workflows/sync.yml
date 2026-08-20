@@ -72,6 +72,7 @@ jobs:
             call "digest"
           elif [ "$SCHEDULE" = "30 5,17 * * *" ]; then
             call "contratos"
+            call "fomento"
           else
             call "pncp" "3"
           fi
