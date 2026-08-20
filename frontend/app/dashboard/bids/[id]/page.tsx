@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, ExternalLink, BookmarkPlus, FileText, Building2,
   Calendar, DollarSign, Tag, Phone, Mail, AlertCircle,
-  Package, Download, Globe, CheckCircle, Clock, XCircle,
+  Package, Download, Globe, CheckCircle, Clock, XCircle, Users, Trophy, Lock,
 } from "lucide-react";
 
 const API     = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -94,6 +94,7 @@ export default function BidDetailPage() {
   const [loading, setLoading] = useState(true);
   const [tracking, setTracking] = useState(false);
   const [elig, setElig] = useState<any>(null);   // análise de aderência (Candidatura Assistida)
+  const [comp, setComp] = useState<any>(null);   // inteligência de concorrência (quem venceu)
 
   // 1) busca o bid do nosso DB
   useEffect(() => {
@@ -136,6 +137,15 @@ export default function BidDetailPage() {
     fetch(`${API}/api/bids/${bid.id}/eligibility`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null)
       .then(d => setElig(d))
+      .catch(() => {});
+  }, [bid?.id, token]);
+
+  // inteligência de concorrência (quem venceu — só para encerradas/homologadas)
+  useEffect(() => {
+    if (!bid?.id || !token) return;
+    fetch(`${API}/api/bids/${bid.id}/competitors`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setComp(d))
       .catch(() => {});
   }, [bid?.id, token]);
 
@@ -314,6 +324,50 @@ export default function BidDetailPage() {
                   </button>
                   <span className="text-xs text-slate-400">Geração de proposta e documentos chega na Fase B.</span>
                 </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Concorrência — quem venceu (dados públicos do PNCP após homologação) */}
+        {comp && (() => {
+          const isOpen = bid.status === "aberta" || bid.status === "andamento" || bid.status === "programada";
+          return (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+              <div className="bg-slate-900 px-6 py-3 flex items-center gap-2 text-white">
+                <Users size={16} />
+                <span className="text-sm font-semibold">Concorrência</span>
+                <span className="text-[11px] text-white/60 ml-1">quem venceu · dados públicos do PNCP</span>
+              </div>
+              <div className="p-6">
+                {isOpen ? (
+                  <div className="flex items-start gap-3 text-sm text-slate-500">
+                    <Lock size={16} className="text-slate-400 shrink-0 mt-0.5" />
+                    <p>Propostas <b>sigilosas até a sessão</b> (por lei). O vencedor e os valores aparecem aqui <b>após a homologação</b>.</p>
+                  </div>
+                ) : comp.has_result ? (
+                  <>
+                    <div className="space-y-2">
+                      {comp.winners.map((w: any, i: number) => (
+                        <div key={w.document} className={`flex items-center gap-3 p-3 rounded-xl border ${i === 0 ? "bg-emerald-50 border-emerald-100" : "bg-slate-50 border-slate-100"}`}>
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${i === 0 ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-600"}`}>
+                            {i === 0 ? <Trophy size={13} /> : <span className="text-xs font-bold">{i + 1}</span>}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium text-slate-800 truncate">{w.name}</div>
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              CNPJ {w.document} · {w.items_won} {w.items_won === 1 ? "item" : "itens"}{w.porte ? ` · ${w.porte}` : ""}
+                            </div>
+                          </div>
+                          <div className="text-sm font-semibold text-slate-900 shrink-0">{fmt(w.total_value)}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-3">💡 Use como benchmark de preço e para mapear concorrentes recorrentes no seu nicho.</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-slate-500">Resultado ainda não publicado no PNCP para esta licitação.</p>
+                )}
               </div>
             </div>
           );

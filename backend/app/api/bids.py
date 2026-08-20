@@ -469,6 +469,32 @@ async def get_bid(bid_id: int, session: AsyncSession = Depends(get_session), _: 
     return _bid_detail(bid)
 
 
+@router.get("/{bid_id}/competitors")
+async def bid_competitors(
+    bid_id: int,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Inteligência de concorrência: quem venceu esta licitação e por quanto
+    (dados públicos do PNCP após a homologação)."""
+    bid = await session.get(PublicBid, bid_id)
+    if not bid:
+        raise HTTPException(404, "Licitação não encontrada")
+    if bid.source != "pncp" or not bid.external_id:
+        return {"has_result": False, "winners": [], "reason": "fonte_sem_resultado"}
+
+    ck = f"comp:{bid.external_id}"
+    hit = cache_get(ck)
+    if hit is not None:
+        return hit
+
+    from app.services.competitors import get_competitors
+    result = await get_competitors(bid.external_id)
+    # cacheia por mais tempo: resultado homologado não muda
+    cache_set(ck, result, ttl=1800 if result.get("has_result") else 300)
+    return result
+
+
 def _split_csv(s):
     return [p.strip() for p in (s or "").split(",") if p.strip()]
 
