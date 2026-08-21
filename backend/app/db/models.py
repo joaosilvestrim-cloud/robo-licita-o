@@ -200,6 +200,7 @@ class PublicBid(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     last_scraped: Optional[datetime] = Field(default=None)
+    winners_synced_at: Optional[datetime] = Field(default=None)   # quando checamos vencedores no PNCP
 
     alerts: List["ProcurementAlert"] = Relationship(back_populates="bid")
     trackings: List["BidTracking"] = Relationship(back_populates="bid")
@@ -501,6 +502,34 @@ class FundingOpportunity(SQLModel, table=True):
 
     is_ti: Optional[bool] = Field(default=None)
     ti_score: Optional[int] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class BidWinner(SQLModel, table=True):
+    """Vencedor de uma licitação (pré-calculado do PNCP após homologação).
+    Uma linha por fornecedor vencedor por licitação. Alimenta a tela Vencedores
+    (lista) e o ranking de concorrentes (agregado por fornecedor)."""
+    __tablename__ = "bid_winners"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    external_id: str = Field(max_length=255)   # controle PNCP da licitação
+    bid_id: Optional[int] = Field(default=None, index=True)
+
+    bid_title: Optional[str] = Field(default=None, max_length=500)
+    organ_name: Optional[str] = Field(default=None, max_length=255)
+    state: Optional[str] = Field(default=None, max_length=2)
+    sphere: Optional[str] = Field(default=None, max_length=20)
+    homologated_at: Optional[date] = Field(default=None)
+
+    supplier_name: Optional[str] = Field(default=None, max_length=255)
+    supplier_document: str = Field(max_length=20)
+    porte: Optional[str] = Field(default=None, max_length=40)
+
+    valor_total: Optional[Decimal] = Field(default=None, decimal_places=2, max_digits=15)
+    items_won: int = Field(default=0)
+    is_ti: Optional[bool] = Field(default=None)
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

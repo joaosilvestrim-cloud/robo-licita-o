@@ -9,6 +9,7 @@ from app.auth import get_current_user, require_user_or_cron
 from app.services.pncp import sync_pncp, sync_pncp_proposta, reindex_ti
 from app.services.pncp_contratos import sync_contratos
 from app.services.fomento import sync_fomento
+from app.services.winners import sync_winners
 from app.services.pncp_search import sync_keyword, sync_all_profile_keywords
 from app.services.alerts import process_alerts
 from app.services.comprasnet import sync_comprasnet
@@ -143,6 +144,7 @@ async def trigger_source_sync(
         "pncp_proposta": (sync_pncp_proposta, {}),
         "contratos":   (sync_contratos,      {}),
         "fomento":     (sync_fomento,        {}),
+        "winners":     (sync_winners,        {}),
         "comprasnet":  (sync_comprasnet,      {"days_back": days_back}),
         "bec_sp":      (sync_bec_sp,          {"days_back": days_back}),
         "licitacoes_e":(sync_licitacoes_e,      {"days_back": days_back}),

@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, FileSearch, Bell, BookmarkCheck,
-  LogOut, ChevronRight, BarChart2, Target, Building2, Database, Users, Sparkles, FileClock, Sprout,
+  LogOut, ChevronRight, BarChart2, Target, Building2, Database, Users, Sparkles, FileClock, Sprout, Trophy,
 } from "lucide-react";
 import ChatWidget from "../components/ChatWidget";
 import { Logo } from "../components/Logo";
@@ -18,6 +18,7 @@ const navGroups = [
     { href: "/dashboard/bids",      label: "Licitações", icon: FileSearch },
     { href: "/dashboard/contracts", label: "Recontratação", icon: FileClock },
     { href: "/dashboard/funding",   label: "Fomento",    icon: Sprout },
+    { href: "/dashboard/winners",   label: "Vencedores", icon: Trophy },
     { href: "/dashboard/alerts",    label: "Alertas",    icon: Bell },
   ]},
   { title: "Minha gestão", items: [

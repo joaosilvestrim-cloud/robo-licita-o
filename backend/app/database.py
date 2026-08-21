@@ -113,6 +113,12 @@ async def init_db():
         "CREATE INDEX IF NOT EXISTS ix_contracts_ti ON public_contracts(is_ti, vigencia_fim)",
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_funding_external ON funding_opportunities(external_id)",
         "CREATE INDEX IF NOT EXISTS ix_funding_open ON funding_opportunities(is_open, is_ti, deadline)",
+        "ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS winners_synced_at TIMESTAMP",
+        "CREATE INDEX IF NOT EXISTS ix_bids_winsync ON public_bids(is_ti, status, winners_synced_at)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_winner_bid_supplier ON bid_winners(external_id, supplier_document)",
+        "CREATE INDEX IF NOT EXISTS ix_winner_supplier ON bid_winners(supplier_document)",
+        "CREATE INDEX IF NOT EXISTS ix_winner_value ON bid_winners(valor_total)",
+        "CREATE INDEX IF NOT EXISTS ix_winner_homolog ON bid_winners(homologated_at)",
     ]
     for _sql in _ddl:
         try:
