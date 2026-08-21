@@ -16,7 +16,10 @@ from app.services.competitors import get_competitors
 logger = logging.getLogger(__name__)
 
 _MAX_BIDS = 12   # licitações processadas por execução (cada uma faz ~8 chamadas PNCP)
-_GIVEUP_DAYS = 45   # sem resultado depois disso, para de tentar
+# janela de homologação: encerradas ha pelo menos alguns dias (ja pode ter
+# resultado) e nao antigas demais. Fora disso nao vale gastar chamada.
+_MIN_DAYS = 12
+_MAX_DAYS = 180
 
 
 async def sync_winners(max_bids: int = _MAX_BIDS):
@@ -26,7 +29,10 @@ async def sync_winners(max_bids: int = _MAX_BIDS):
     today = date.today()
     try:
         async with AsyncSessionLocal() as session:
-            # licitações de TI encerradas ainda não checadas, mais recentes primeiro
+            # licitações de TI encerradas na janela de homologação, ainda não
+            # checadas. Mais recentes dentro da janela primeiro.
+            oldest = today - timedelta(days=_MAX_DAYS)
+            newest = today - timedelta(days=_MIN_DAYS)
             stmt = (
                 select(PublicBid)
                 .where(
@@ -35,8 +41,11 @@ async def sync_winners(max_bids: int = _MAX_BIDS):
                     PublicBid.external_id != None,  # noqa: E711
                     PublicBid.source == "pncp",
                     PublicBid.winners_synced_at == None,  # noqa: E711
+                    PublicBid.closing_date != None,  # noqa: E711
+                    PublicBid.closing_date >= oldest,
+                    PublicBid.closing_date <= newest,
                 )
-                .order_by(PublicBid.closing_date.desc().nullslast())
+                .order_by(PublicBid.closing_date.desc())
                 .limit(max_bids)
             )
             bids = (await session.execute(stmt)).scalars().all()
@@ -80,12 +89,9 @@ async def sync_winners(max_bids: int = _MAX_BIDS):
                         else:
                             session.add(BidWinner(**payload))
                             inserted += 1
-                    bid.winners_synced_at = datetime.utcnow()
-                else:
-                    # sem resultado: só desiste se a licitação já é antiga
-                    if bid.closing_date and bid.closing_date < today - timedelta(days=_GIVEUP_DAYS):
-                        bid.winners_synced_at = datetime.utcnow()
-                    # senão deixa NULL para tentar de novo no próximo ciclo
+                # sempre marca como checada para a fila avançar (com ou sem
+                # resultado). Um recheck periódico das sem-vencedor fica p/ depois.
+                bid.winners_synced_at = datetime.utcnow()
 
             await session.commit()
         log.status = ScrapeStatus.sucesso
