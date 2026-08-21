@@ -25,6 +25,9 @@ O Sonar monitora licitações do PNCP (Portal Nacional de Contratações Públic
 - **Meus Perfis**: o usuário cadastra palavras-chave, estados e faixa de valor para receber alertas.
 - **Alertas**: licitações que casaram com o perfil.
 - **Acompanhando**: o que a empresa participou/ganhou/perdeu.
+- **Recontratação**: contratos públicos de TI/dados que vão vencer. Mostra quem tem o contrato hoje (incumbente) e por quanto. Serve para chegar antes na renovação.
+- **Fomento**: chamadas de fomento à inovação abertas (FAPESP). Para consultoria de dados o alvo é o PIPE (dinheiro não reembolsável para desenvolver tecnologia).
+- **Concorrência**: em cada licitação encerrada/homologada, a análise dos licitantes (quem venceu, por quanto, ranking por item e quanto ficou abaixo do estimado). Bom como benchmark de preço.
 - **Relatórios** e **Minha Empresa** (Cartão CNPJ) e **Fontes de Dados**.
 
 Quando o usuário quiser algo que uma tela resolve melhor, cite a tela (ex.: "crie um perfil em **Meus Perfis**" ou "veja o **Radar** na tela de Licitações").
@@ -93,6 +96,28 @@ PROCUREMENT_TOOLS = [
             "min_value": {"type": "number"},
             "max_value": {"type": "number"},
         }, "required": ["name"]},
+    }},
+    {"type": "function", "function": {
+        "name": "get_competitors",
+        "description": "Análise dos licitantes de uma licitação encerrada/homologada: quem venceu, por quanto, ranking por item e benchmark estimado vs homologado. Passe o ID interno da licitação.",
+        "parameters": {"type": "object", "properties": {
+            "bid_id": {"type": "integer"},
+        }, "required": ["bid_id"]},
+    }},
+    {"type": "function", "function": {
+        "name": "list_expiring_contracts",
+        "description": "Contratos públicos de TI/dados que vão vencer (Recontratação). Traz o incumbente (quem tem o contrato hoje), o valor e o prazo. Use para achar renovações que vão abrir.",
+        "parameters": {"type": "object", "properties": {
+            "months": {"type": "integer", "default": 12, "description": "janela de vencimento em meses"},
+            "state": {"type": "string", "description": "UF, ex: SP"},
+        }, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "list_funding",
+        "description": "Chamadas de fomento à inovação abertas (FAPESP), ordenadas por prazo. Use para perguntas sobre editais de fomento, PIPE, financiamento de pesquisa/inovação.",
+        "parameters": {"type": "object", "properties": {
+            "only_ti": {"type": "boolean", "default": True, "description": "só chamadas com aderência a TI/dados"},
+        }, "required": []},
     }},
     {"type": "function", "function": {
         "name": "explain_modality",
@@ -203,6 +228,14 @@ async def execute_tool(name: str, args: dict, user_token: str = None) -> str:
             }
             profile = {k: v for k, v in profile.items() if v is not None}
             return json.dumps(await _call_api("/api/profiles", method="POST", body=profile, token=user_token), ensure_ascii=False, default=str)
+        if name == "get_competitors":
+            return json.dumps(await _call_api(f"/api/bids/{args['bid_id']}/competitors", token=user_token), ensure_ascii=False, default=str)
+        if name == "list_expiring_contracts":
+            params = {k: v for k, v in args.items() if v is not None}
+            return json.dumps(await _call_api("/api/contracts/expiring", params=params, token=user_token), ensure_ascii=False, default=str)
+        if name == "list_funding":
+            params = {k: v for k, v in args.items() if v is not None}
+            return json.dumps(await _call_api("/api/funding/open", params=params, token=user_token), ensure_ascii=False, default=str)
         if name == "explain_modality":
             return json.dumps({"explanation": _explain_modality_local(args.get("modality_name", ""))}, ensure_ascii=False)
         if name == "suggest_keywords":
