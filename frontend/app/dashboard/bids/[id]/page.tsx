@@ -4,8 +4,21 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, ExternalLink, BookmarkPlus, FileText, Building2,
   Calendar, DollarSign, Tag, Phone, Mail, AlertCircle,
-  Package, Download, Globe, CheckCircle, Clock, XCircle, Users, Trophy, Lock,
+  Package, Download, Globe, CheckCircle, Clock, XCircle, Users, Trophy, Lock, ChevronRight, TrendingDown,
 } from "lucide-react";
+
+// situação do licitante no resultado (estilo "análise dos licitantes")
+function SituBadge({ situacao, isWinner }: { situacao?: string; isWinner?: boolean }) {
+  const s = (situacao || "").toLowerCase();
+  const cls =
+    isWinner || s.includes("vencedor")
+      ? "bg-emerald-100 text-emerald-700"
+      : s.includes("desclass") || s.includes("cancel") || s.includes("inabilit")
+      ? "bg-red-100 text-red-700"
+      : "bg-slate-100 text-slate-500";
+  const label = isWinner && !s.includes("vencedor") ? "Vencedor" : (situacao || "—");
+  return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${cls}`}>{label}</span>;
+}
 
 const API     = process.env.NEXT_PUBLIC_API_URL ?? "";
 const PNCP_B  = "https://pncp.gov.br/api/consulta/v1";
@@ -350,6 +363,19 @@ export default function BidDetailPage() {
                   </div>
                 ) : comp.has_result ? (
                   <>
+                    {/* benchmark de preço: estimado vs homologado */}
+                    {(comp.estimated_total || comp.homologated_total) && (
+                      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-4 pb-3 border-b border-slate-50 text-xs">
+                        {comp.estimated_total ? <span className="text-slate-500">Estimado <b className="text-slate-700">{fmt(comp.estimated_total)}</b></span> : null}
+                        {comp.homologated_total ? <span className="text-slate-500">Homologado <b className="text-emerald-700">{fmt(comp.homologated_total)}</b></span> : null}
+                        {comp.estimated_total && comp.homologated_total ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
+                            <TrendingDown size={12} /> {Math.round((1 - comp.homologated_total / comp.estimated_total) * 100)}% abaixo do estimado
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       {comp.winners.map((w: any, i: number) => (
                         <div key={w.document} className={`flex items-center gap-3 p-3 rounded-xl border ${i === 0 ? "bg-emerald-50 border-emerald-100" : "bg-slate-50 border-slate-100"}`}>
@@ -366,6 +392,39 @@ export default function BidDetailPage() {
                         </div>
                       ))}
                     </div>
+
+                    {/* análise dos licitantes por item (ranking 1º/2º/3º com situação) */}
+                    {comp.items?.length > 0 && (
+                      <details className="mt-4 group">
+                        <summary className="cursor-pointer list-none text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1 select-none">
+                          <ChevronRight size={13} className="transition group-open:rotate-90" />
+                          Análise dos licitantes por item ({comp.items.length})
+                        </summary>
+                        <div className="mt-3 space-y-2.5">
+                          {comp.items.map((it: any) => (
+                            <div key={it.numero} className="border border-slate-100 rounded-xl p-3">
+                              <div className="flex items-center justify-between gap-2 mb-1.5">
+                                <span className="text-xs font-semibold text-slate-700">Item {it.numero}</span>
+                                {it.valor_estimado ? <span className="text-[11px] text-slate-400">estimado {fmt(it.valor_estimado)}</span> : null}
+                              </div>
+                              {it.descricao ? <p className="text-[11px] text-slate-500 line-clamp-2 mb-2">{it.descricao}</p> : null}
+                              <div className="space-y-1">
+                                {it.results.map((r: any, ri: number) => (
+                                  <div key={r.document + ri} className="flex items-center gap-2 text-xs">
+                                    <span className="w-5 text-slate-400 shrink-0 text-center">{r.ordem ? `${r.ordem}º` : "–"}</span>
+                                    <SituBadge situacao={r.situacao} isWinner={r.is_winner} />
+                                    <span className="flex-1 truncate text-slate-700">{r.name}</span>
+                                    {r.desconto ? <span className="text-[10px] text-slate-400 shrink-0">-{Math.round(r.desconto)}%</span> : null}
+                                    {r.valor_total > 0 ? <span className="font-medium text-slate-800 shrink-0">{fmt(r.valor_total)}</span> : null}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+
                     <p className="text-[11px] text-slate-400 mt-3">💡 Use como benchmark de preço e para mapear concorrentes recorrentes no seu nicho.</p>
                   </>
                 ) : (
