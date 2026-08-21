@@ -31,6 +31,28 @@ def _strip(s: str) -> str:
     return " ".join(re.sub(r"<[^>]+>", " ", s).replace("&nbsp;", " ").split())
 
 
+# No fomento o vocabulário é de inovação/tecnologia, não de objeto de licitação.
+# Estes sinais marcam a chamada como aderente a uma consultoria de dados/TI.
+_FOMENTO_TI = [
+    "pipe", "inova", "tecnolog", "digital", "dados", "software", "sistema",
+    "computa", "intelig", "quantic", "startup", "deep tech", "cibern", "ciber",
+    "internet", "5g", "eletron", "automa", "algoritmo", "plataforma",
+    "transformacao digital", "soberania digital", "industria 4", "iot",
+]
+
+
+def _fold(s: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", (s or "").lower())
+                   if unicodedata.category(c) != "Mn")
+
+
+def _fomento_is_ti(*parts) -> bool:
+    """Aderência a TI/dados no contexto de fomento (inovação, PIPE, digital...)."""
+    text = _fold(" ".join(p for p in parts if p))
+    return any(term in text for term in _FOMENTO_TI)
+
+
 def _pdate(br: Optional[str]) -> Optional[date]:
     if not br:
         return None
@@ -62,6 +84,9 @@ def _parse_fapesp(html: str) -> list[dict]:
         area = _strip(area_m.group(1)) if area_m else None
         modality = _strip(mod_m.group(1)) if mod_m else None
         is_ti, ti_score = classify_ti(title, area, modality)
+        # amplia com o vocabulário de inovação/fomento (PIPE, tecnológica, digital...)
+        if not is_ti and _fomento_is_ti(title, area, modality):
+            is_ti, ti_score = True, max(ti_score, 3)
         out.append({
             "external_id": f"fapesp::{cid}",
             "source": "fapesp",
