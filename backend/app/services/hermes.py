@@ -113,6 +113,15 @@ PROCUREMENT_TOOLS = [
         }, "required": []},
     }},
     {"type": "function", "function": {
+        "name": "list_winners",
+        "description": "Vencedores das licitações de TI já homologadas: quem ganhou o quê e por quanto, mais o ranking dos concorrentes que mais vencem. Use para 'quem ganhou', 'quem são meus concorrentes', benchmark de preço.",
+        "parameters": {"type": "object", "properties": {
+            "q": {"type": "string", "description": "nome do concorrente ou objeto"},
+            "state": {"type": "string", "description": "UF, ex: SP"},
+            "months": {"type": "integer", "description": "homologadas nos últimos N meses (0 = tudo)"},
+        }, "required": []},
+    }},
+    {"type": "function", "function": {
         "name": "list_funding",
         "description": "Chamadas de fomento à inovação abertas (FAPESP), ordenadas por prazo. Use para perguntas sobre editais de fomento, PIPE, financiamento de pesquisa/inovação.",
         "parameters": {"type": "object", "properties": {
@@ -236,6 +245,9 @@ async def execute_tool(name: str, args: dict, user_token: str = None) -> str:
         if name == "list_funding":
             params = {k: v for k, v in args.items() if v is not None}
             return json.dumps(await _call_api("/api/funding/open", params=params, token=user_token), ensure_ascii=False, default=str)
+        if name == "list_winners":
+            params = {k: v for k, v in args.items() if v is not None}
+            return json.dumps(await _call_api("/api/winners", params=params, token=user_token), ensure_ascii=False, default=str)
         if name == "explain_modality":
             return json.dumps({"explanation": _explain_modality_local(args.get("modality_name", ""))}, ensure_ascii=False)
         if name == "suggest_keywords":
