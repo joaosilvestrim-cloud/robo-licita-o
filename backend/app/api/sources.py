@@ -22,10 +22,18 @@ async def list_portals(
         .order_by(func.count().desc())
     )).all()
     total = sum(r.n for r in rows)
-    return {
-        "total": total,
-        "portals": [{"portal": r.source_portal, "count": r.n} for r in rows],
-    }
+    # portais nomeados no topo; cauda longa e genéricos viram "Outros / PNCP"
+    TOP = 28
+    named, outros = [], 0
+    for r in rows:
+        p = (r.source_portal or "").strip()
+        if p.startswith("Outros") or len(named) >= TOP:
+            outros += r.n
+        else:
+            named.append({"portal": p, "count": r.n})
+    if outros:
+        named.append({"portal": "Outros / PNCP", "count": outros})
+    return {"total": total, "portals": named, "distinct": len(rows)}
 
 # fontes que compartilham o mesmo status de scrape (todas vêm do PNCP)
 _STATUS_KEY = {

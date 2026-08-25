@@ -37,13 +37,25 @@ _MAP = [
     ("equiplano", "Equiplano"),
     ("publicnet", "PublicNet"),
     ("ammlicita", "AMM Licita"),
+    ("amm licita", "AMM Licita"),
     ("cidadecompras", "Cidade Compras"),
+    ("bnccompras", "BNC"),
+    ("licitardigital", "Licitar Digital"),
+    ("licitamaisbrasil", "Licita Mais Brasil"),
+    ("comprasbr", "ComprasBR"),
+    ("sigep", "SIGEP"),
     ("comprasgovernamentais", "Compras.gov.br (Comprasnet)"),
     ("comprasnet", "Compras.gov.br (Comprasnet)"),
     ("gov.br/compras", "Compras.gov.br (Comprasnet)"),
     ("compras.gov", "Compras.gov.br (Comprasnet)"),
     ("pncp.gov", "PNCP (direto)"),
 ]
+
+# domínios que NÃO são portais de compra (só hospedam o PDF do edital) -> Outros
+_GENERIC = ("google.", "drive.google", "dropbox", "onedrive", "sharepoint",
+            "sei.", "transparencia", "tce.", "diario", "imprensaoficial",
+            "precodereferencia", "m2atecnologia", "empro.", "srv.br",
+            "s3.amazonaws", "blob.core", "storage.")
 
 
 def portal_from_url(url: str | None) -> str | None:
@@ -58,9 +70,11 @@ def portal_from_url(url: str | None) -> str | None:
     for needle, name in _MAP:
         if needle in hay:
             return name
+    if any(g in hay for g in _GENERIC):
+        return "Outros / PNCP"
     # desconhecido: usa o domínio “limpo” como rótulo
     host = host.replace("www.", "")
-    return host.split(":")[0] if host else None
+    return (host.split(":")[0] if host else None) or "Outros / PNCP"
 
 
 async def backfill_portals(limit: int = 4000):
@@ -68,7 +82,7 @@ async def backfill_portals(limit: int = 4000):
     de origem (edital_url/details_url). Roda em lote, seguro para reexecução."""
     import logging
     from datetime import datetime
-    from sqlmodel import select
+    from sqlmodel import select, or_
     from app.db.models import PublicBid, ScrapeLog, ScrapeStatus
     from app.database import AsyncSessionLocal
     log = logging.getLogger(__name__)
@@ -76,15 +90,18 @@ async def backfill_portals(limit: int = 4000):
     updated = 0
     try:
         async with AsyncSessionLocal() as session:
+            # pega sem etiqueta OU com etiqueta de dominio cru (contém ".") para
+            # reaplicar o mapa melhorado
             rows = (await session.execute(
                 select(PublicBid).where(
-                    PublicBid.source_portal == None,  # noqa: E711
                     PublicBid.source == "pncp",
+                    or_(PublicBid.source_portal == None,          # noqa: E711
+                        PublicBid.source_portal.like("%.%")),
                 ).limit(limit)
             )).scalars().all()
             for b in rows:
                 p = portal_from_url(b.edital_url or b.details_url)
-                if p:
+                if p and p != b.source_portal:
                     b.source_portal = p[:60]
                     updated += 1
             await session.commit()
