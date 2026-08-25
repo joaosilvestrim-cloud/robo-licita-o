@@ -5,6 +5,7 @@ import {
   ArrowLeft, ExternalLink, BookmarkPlus, FileText, Building2,
   Calendar, DollarSign, Tag, Phone, Mail, AlertCircle,
   Package, Download, Globe, CheckCircle, Clock, XCircle, Users, Trophy, Lock, ChevronRight, TrendingDown, Gavel, Info,
+  MessageSquare, Send, Loader2, Sparkles,
 } from "lucide-react";
 
 // situação do licitante no resultado (estilo "análise dos licitantes")
@@ -131,6 +132,9 @@ export default function BidDetailPage() {
   const [loading, setLoading] = useState(true);
   const [tracking, setTracking] = useState(false);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [edQ, setEdQ] = useState("");
+  const [edA, setEdA] = useState<{ answer: string; url?: string; titulo?: string } | null>(null);
+  const [edLoading, setEdLoading] = useState(false);
   const [elig, setElig] = useState<any>(null);   // análise de aderência (Candidatura Assistida)
   const [comp, setComp] = useState<any>(null);   // inteligência de concorrência (quem venceu)
 
@@ -199,6 +203,24 @@ export default function BidDetailPage() {
   }, [bid?.id, token]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
+
+  async function askEdital(question: string) {
+    const q = question.trim();
+    if (!q || !bid?.id) return;
+    setEdLoading(true); setEdA(null); setEdQ(q);
+    try {
+      const res = await fetch(`${API}/api/bids/${bid.id}/ask-edital`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q }),
+      });
+      const d = await res.json();
+      setEdA({ answer: d.answer ?? "Sem resposta.", url: d.url, titulo: d.titulo });
+    } catch {
+      setEdA({ answer: "Não consegui consultar o edital agora." });
+    }
+    setEdLoading(false);
+  }
 
   function toggleTask(taskId: number, done: boolean) {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, done } : t));
@@ -409,6 +431,56 @@ export default function BidDetailPage() {
             </div>
           );
         })()}
+
+        {/* Converse com o edital — IA responde com base no PDF do edital */}
+        {bid.source === "pncp" && (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+            <div className="bg-gradient-to-r from-proc-600 to-indigo-600 px-6 py-3 flex items-center gap-2 text-white">
+              <MessageSquare size={16} />
+              <span className="text-sm font-semibold">Converse com o edital</span>
+              <span className="text-[11px] text-white/70 ml-1 flex items-center gap-1"><Sparkles size={11} /> IA lê o PDF e responde</span>
+            </div>
+            <div className="p-5">
+              <div className="flex gap-2">
+                <input
+                  value={edQ}
+                  onChange={e => setEdQ(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") askEdital(edQ); }}
+                  placeholder="Ex.: qual o prazo de entrega? exige atestado? qual a garantia?"
+                  className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-proc-400" />
+                <button onClick={() => askEdital(edQ)} disabled={edLoading || edQ.trim().length < 3}
+                  className="flex items-center gap-1.5 px-4 py-2 dd-gradient text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                  {edLoading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {["Exige atestado de capacidade técnica?", "Qual o prazo de entrega/execução?", "Aceita ME/EPP?", "Qual a forma de pagamento?"].map(s => (
+                  <button key={s} onClick={() => askEdital(s)} disabled={edLoading}
+                    className="text-[11px] text-slate-500 bg-slate-50 hover:bg-slate-100 border border-slate-100 px-2 py-1 rounded-full transition">
+                    {s}
+                  </button>
+                ))}
+              </div>
+              {edLoading && (
+                <div className="mt-4 flex items-center gap-2 text-sm text-slate-400">
+                  <Loader2 size={15} className="animate-spin" /> Lendo o edital…
+                </div>
+              )}
+              {edA && !edLoading && (
+                <div className="mt-4 rounded-xl bg-slate-50 border border-slate-100 p-4">
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{edA.answer}</p>
+                  {edA.url && (
+                    <a href={edA.url} target="_blank" rel="noopener noreferrer"
+                      className="text-[11px] text-proc-600 hover:text-proc-700 font-medium inline-flex items-center gap-1 mt-2">
+                      <FileText size={11} /> {edA.titulo ?? "Abrir edital"}
+                    </a>
+                  )}
+                  <p className="text-[10px] text-slate-400 mt-2">A IA responde com base no texto do edital. Confirme sempre no documento oficial.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Negócio — tarefas com prazos (gerado ao adicionar aos negócios) */}
         {tasks.length > 0 && (

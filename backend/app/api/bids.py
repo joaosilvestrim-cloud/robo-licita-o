@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Query, HTTPException
+from pydantic import BaseModel
 from sqlmodel import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
@@ -541,6 +542,46 @@ async def bid_files(
     result = await get_files(bid.external_id)
     cache_set(ck, result, ttl=1800 if result.get("has_files") else 300)
     return result
+
+
+class AskEditalBody(BaseModel):
+    question: str
+
+
+@router.post("/{bid_id}/ask-edital")
+async def ask_edital_endpoint(
+    bid_id: int,
+    body: AskEditalBody,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Converse com o edital: responde a pergunta com base no texto do edital (PNCP)."""
+    bid = await session.get(PublicBid, bid_id)
+    if not bid:
+        raise HTTPException(404, "Licitação não encontrada")
+    if bid.source != "pncp" or not bid.external_id:
+        return {"ok": False, "answer": "Esta licitação não tem edital em PDF acessível pelo PNCP."}
+    q = (body.question or "").strip()
+    if len(q) < 3:
+        return {"ok": False, "answer": "Faça uma pergunta sobre o edital."}
+
+    from app.services.edital_chat import get_edital_text, ask_edital
+    tk = f"edital_txt:{bid.external_id}"
+    edital = cache_get(tk)
+    if edital is None:
+        edital = await get_edital_text(bid.external_id)
+        cache_set(tk, edital, ttl=3600 if edital.get("ok") else 300)
+    if not edital.get("ok"):
+        motivos = {
+            "sem_arquivo": "Não achei o edital em PDF no PNCP para esta licitação.",
+            "sem_texto": "O edital parece ser um PDF escaneado (imagem), não consegui ler o texto.",
+            "pdf_grande": "O edital é muito grande para ler automaticamente.",
+        }
+        return {"ok": False, "answer": motivos.get(edital.get("reason"), "Não consegui ler o edital agora."),
+                "titulo": edital.get("titulo"), "url": edital.get("url")}
+
+    answer = await ask_edital(edital["text"], q)
+    return {"ok": True, "answer": answer, "titulo": edital.get("titulo"), "url": edital.get("url")}
 
 
 def _split_csv(s):
