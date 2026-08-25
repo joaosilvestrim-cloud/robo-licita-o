@@ -155,18 +155,18 @@ export default function BidDetailPage() {
       .then(d => { if (d && !d.status) setDetail(d); })
       .catch(() => {});
 
-    // Itens/lotes
-    fetch(`${PNCP_B}/orgaos/${cnpj}/compras/${ano}/${seq}/itens?pagina=1&tamanhoPagina=50`)
-      .then(r => r.ok ? r.json() : [])
-      .then(d => { if (Array.isArray(d)) setItems(d); })
+    // Itens/lotes (via backend: base correta do PNCP + sem CORS)
+    fetch(`${API}/api/bids/${bid.id}/items`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.items) setItems(d.items); })
       .catch(() => {});
 
-    // Arquivos/documentos
-    fetch(`${PNCP_B}/orgaos/${cnpj}/compras/${ano}/${seq}/arquivos`)
-      .then(r => r.ok ? r.json() : [])
-      .then(d => { if (Array.isArray(d)) setFiles(d); })
+    // Arquivos/documentos do edital
+    fetch(`${API}/api/bids/${bid.id}/files`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.files) setFiles(d.files); })
       .catch(() => {});
-  }, [bid?.external_id]);
+  }, [bid?.external_id, bid?.id, token]);
 
   // análise de aderência do perfil (Candidatura Assistida — Fase A)
   useEffect(() => {
@@ -583,23 +583,24 @@ export default function BidDetailPage() {
                   {items.map((item: any, i: number) => (
                     <tr key={i} className="hover:bg-slate-50 transition">
                       <td className="py-2.5 px-3 text-slate-500 text-xs whitespace-nowrap">
-                        {item.numeroItem ?? item.item ?? i + 1}
+                        {item.numero ?? i + 1}
                       </td>
                       <td className="py-2.5 px-3 text-slate-700 max-w-sm">
-                        <div className="line-clamp-2">{item.descricao ?? item.materialServico?.descricao ?? "—"}</div>
-                        {item.materialServico?.codigo && (
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">{item.materialServico.codigo}</div>
-                        )}
+                        <div className="line-clamp-2">{item.descricao || "—"}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5 flex gap-2">
+                          {item.tipo && <span>{item.tipo}</span>}
+                          {item.criterio && <span>· {item.criterio}</span>}
+                          {item.beneficio && item.beneficio !== "Não se aplica" && <span className="text-emerald-600">· {item.beneficio}</span>}
+                        </div>
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap text-slate-600 text-xs">
-                        {item.quantidade ?? "—"} {item.unidadeMedida ?? ""}
+                        {item.quantidade ?? "—"} {item.unidade ?? ""}
                       </td>
                       <td className="py-2.5 px-3 text-right whitespace-nowrap text-slate-700 text-xs">
-                        {fmt(item.valorUnitarioEstimado)}
+                        {fmt(item.valor_unitario)}
                       </td>
                       <td className="py-2.5 px-3 text-right whitespace-nowrap font-medium text-slate-900 text-xs">
-                        {fmt(item.valorTotal ?? (item.valorUnitarioEstimado && item.quantidade
-                          ? item.valorUnitarioEstimado * item.quantidade : null))}
+                        {fmt(item.valor_total)}
                       </td>
                     </tr>
                   ))}

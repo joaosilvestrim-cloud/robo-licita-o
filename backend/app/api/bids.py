@@ -499,6 +499,50 @@ async def bid_competitors(
     return result
 
 
+@router.get("/{bid_id}/items")
+async def bid_items(
+    bid_id: int,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Itens da licitação (o que está sendo comprado, item a item). Dados do PNCP."""
+    bid = await session.get(PublicBid, bid_id)
+    if not bid:
+        raise HTTPException(404, "Licitação não encontrada")
+    if bid.source != "pncp" or not bid.external_id:
+        return {"has_items": False, "items": [], "reason": "fonte_sem_itens"}
+    ck = f"items:{bid.external_id}"
+    hit = cache_get(ck)
+    if hit is not None:
+        return hit
+    from app.services.bid_items import get_items
+    result = await get_items(bid.external_id)
+    cache_set(ck, result, ttl=1800 if result.get("has_items") else 300)
+    return result
+
+
+@router.get("/{bid_id}/files")
+async def bid_files(
+    bid_id: int,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Arquivos/documentos do edital (PDF, termo de referência...). Dados do PNCP."""
+    bid = await session.get(PublicBid, bid_id)
+    if not bid:
+        raise HTTPException(404, "Licitação não encontrada")
+    if bid.source != "pncp" or not bid.external_id:
+        return {"has_files": False, "files": [], "reason": "fonte_sem_arquivos"}
+    ck = f"files:{bid.external_id}"
+    hit = cache_get(ck)
+    if hit is not None:
+        return hit
+    from app.services.bid_items import get_files
+    result = await get_files(bid.external_id)
+    cache_set(ck, result, ttl=1800 if result.get("has_files") else 300)
+    return result
+
+
 def _split_csv(s):
     return [p.strip() for p in (s or "").split(",") if p.strip()]
 
