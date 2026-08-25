@@ -101,6 +101,8 @@ async def init_db():
         "ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS is_ti BOOLEAN",
         "ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS dispute_mode VARCHAR(40)",
         "CREATE INDEX IF NOT EXISTS ix_bids_dispute ON public_bids(dispute_mode)",
+        "ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS source_portal VARCHAR(60)",
+        "CREATE INDEX IF NOT EXISTS ix_bids_portal ON public_bids(source_portal)",
         "ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS ti_score INTEGER",
         "CREATE INDEX IF NOT EXISTS ix_bids_ti ON public_bids(is_ti, ti_score)",
         "CREATE INDEX IF NOT EXISTS ix_bids_status ON public_bids(status)",

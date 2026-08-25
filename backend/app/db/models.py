@@ -175,6 +175,7 @@ class PublicBid(SQLModel, table=True):
     maximum_value: Optional[Decimal] = Field(default=None, decimal_places=2, max_digits=15)
     modality: Optional[BidModality] = Field(default=None)
     dispute_mode: Optional[str] = Field(default=None, max_length=40)   # modoDisputaNome do PNCP
+    source_portal: Optional[str] = Field(default=None, max_length=60)   # portal de origem (linkSistemaOrigem)
 
     # Requisitos
     min_patrimony: Optional[Decimal] = Field(default=None, decimal_places=2, max_digits=15)

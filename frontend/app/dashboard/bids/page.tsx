@@ -102,6 +102,7 @@ export default function BidsPage() {
   const [itMode, setItMode]         = useState(false);
   const [modality, setModality]     = useState("");
   const [disputeMode, setDisputeMode] = useState("");
+  const [portal, setPortal] = useState("");
   const [minValue, setMinValue]     = useState("");
   const [maxValue, setMaxValue]     = useState("");
   const [daysBefore, setDaysBefore] = useState("");
@@ -149,6 +150,7 @@ export default function BidsPage() {
     if (clean(city))   params.set("city", clean(city));
     if (clean(modality)) params.set("modality", clean(modality));
     if (clean(disputeMode)) params.set("dispute_mode", clean(disputeMode));
+    if (clean(portal)) params.set("source_portal", clean(portal));
     if (minValue)      params.set("min_value", minValue);
     if (maxValue)      params.set("max_value", maxValue);
     if (daysBefore)    params.set("days_before_closing", daysBefore);
@@ -169,7 +171,13 @@ export default function BidsPage() {
       setTotal(data.total ?? 0);
     } catch {}
     setLoading(false);
-  }, [page, q, sphere, state, city, modality, disputeMode, minValue, maxValue, daysBefore, sortBy, sortDir, selectedStatus, onlyOpenForProposals, itMode, token]);
+  }, [page, q, sphere, state, city, modality, disputeMode, portal, minValue, maxValue, daysBefore, sortBy, sortDir, selectedStatus, onlyOpenForProposals, itMode, token]);
+
+  // lê ?portal= da URL (vindo da tela de Fontes) e aplica como filtro
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("portal");
+    if (p) { setPortal(p); setOnlyOpenForProposals(false); setSelectedStatus(new Set(["aberta", "encerrada", "andamento", "programada"])); }
+  }, []);
 
   function toggleSort(col: string) {
     if (sortBy === col) {
@@ -244,6 +252,12 @@ export default function BidsPage() {
                   {state ? ` · ${state}` : ""}
                   {city ? ` · ${city}` : ""}
                 </p>
+                {portal && (
+                  <button onClick={() => { setPortal(""); setPage(1); }}
+                    className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-proc-700 bg-proc-50 border border-proc-200 px-2 py-0.5 rounded-full hover:bg-proc-100">
+                    Portal: {portal} <X size={11} />
+                  </button>
+                )}
               </div>
             </div>
 

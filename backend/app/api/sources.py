@@ -1,11 +1,31 @@
 from fastapi import APIRouter, Depends
-from sqlmodel import select
+from sqlmodel import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
-from app.db.models import DataSource, ScrapeLog, User
+from app.db.models import DataSource, ScrapeLog, PublicBid, User
 from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
+
+
+@router.get("/portals")
+async def list_portals(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Portais de origem das licitações (de qual sistema cada uma veio, via PNCP),
+    com a contagem real de licitações de cada um."""
+    rows = (await session.execute(
+        select(PublicBid.source_portal, func.count().label("n"))
+        .where(PublicBid.source_portal != None)  # noqa: E711
+        .group_by(PublicBid.source_portal)
+        .order_by(func.count().desc())
+    )).all()
+    total = sum(r.n for r in rows)
+    return {
+        "total": total,
+        "portals": [{"portal": r.source_portal, "count": r.n} for r in rows],
+    }
 
 # fontes que compartilham o mesmo status de scrape (todas vêm do PNCP)
 _STATUS_KEY = {

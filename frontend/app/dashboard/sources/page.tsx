@@ -66,6 +66,8 @@ export default function SourcesPage() {
   const [loading, setLoading]   = useState(true);
   const [syncing, setSyncing]   = useState<string | null>(null);
   const [syncMsg, setSyncMsg]   = useState<string | null>(null);
+  const [portals, setPortals]   = useState<any[]>([]);
+  const [portalTotal, setPortalTotal] = useState(0);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("proc_token") ?? "" : "";
 
@@ -75,6 +77,10 @@ export default function SourcesPage() {
       const r = await fetch(`${API}/api/sources`, { headers: { Authorization: `Bearer ${token}` } });
       if (r.status === 401) { router.replace("/login"); return; }
       setSources(await r.json());
+      fetch(`${API}/api/sources/portals`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(x => x.ok ? x.json() : null)
+        .then(d => { if (d) { setPortals(d.portals ?? []); setPortalTotal(d.total ?? 0); } })
+        .catch(() => {});
     } finally {
       setLoading(false);
     }
@@ -224,18 +230,29 @@ export default function SourcesPage() {
           </div>
         )}
 
-        {/* Legenda de identificação na listagem */}
-        <div className="mt-6 p-4 bg-white border border-slate-200 rounded-xl">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Como identificar a fonte em cada licitação</p>
-          <div className="flex flex-wrap gap-2">
-            {sources.map(s => (
-              <span key={s.key} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-full text-xs text-slate-600 font-medium">
-                {SOURCE_ICONS[s.key]} {s.name}
-                <code className="text-[10px] text-slate-400 font-mono">#{s.key}</code>
-              </span>
-            ))}
+        {/* Portais de origem — de qual sistema cada licitação veio (via PNCP) */}
+        {portals.length > 0 && (
+          <div className="mt-6 p-5 bg-white border border-slate-200 rounded-xl">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm font-semibold text-slate-700">Portais de origem</p>
+              <span className="text-xs text-slate-400">{portalTotal.toLocaleString("pt-BR")} licitações · {portals.length} portais</span>
+            </div>
+            <p className="text-xs text-slate-400 mb-4 max-w-2xl">
+              De qual sistema cada licitação foi publicada. Todos chegam a nós pelo <b>PNCP</b> (hub oficial da Lei 14.133),
+              então cobrimos esses portais sem raspar cada um. Clique para filtrar as licitações do portal.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {portals.map(p => (
+                <a key={p.portal}
+                  href={`/dashboard/bids?portal=${encodeURIComponent(p.portal)}`}
+                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-slate-100 bg-slate-50/60 hover:border-proc-300 hover:bg-white transition">
+                  <span className="text-xs font-medium text-slate-700 truncate">{p.portal}</span>
+                  <span className="text-[11px] font-mono font-semibold text-slate-500 shrink-0">{p.count.toLocaleString("pt-BR")}</span>
+                </a>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

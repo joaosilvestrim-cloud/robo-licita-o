@@ -14,6 +14,7 @@ from sqlmodel import select
 from app.db.models import PublicBid, ScrapeLog, BidStatus, BidSphere, BidModality, ScrapeStatus
 from app.database import AsyncSessionLocal
 from app.services.pncp import _parse_date, _parse_decimal, MODALITY_MAP, STATUS_MAP, SPHERE_MAP
+from app.services.portals import portal_from_url as _portal_from_url
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,7 @@ def _map_search_item(item: dict, detail: Optional[dict] = None) -> dict:
         "status": status,
         "estimated_value": estimated_value,
         "modality": modality,
+        "source_portal": _portal_from_url(edital_url),
         "edital_url": edital_url,
         "details_url": edital_url,
         "last_scraped": datetime.utcnow(),

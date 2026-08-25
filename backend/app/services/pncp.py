@@ -7,6 +7,7 @@ from sqlmodel import select
 from app.db.models import PublicBid, ScrapeLog, BidStatus, BidSphere, BidModality, ScrapeStatus
 from app.database import AsyncSessionLocal
 from app.services.ti_classifier import classify as classify_ti
+from app.services.portals import portal_from_url as _portal_from_url
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,7 @@ def _map_bid(item: dict, source_key: str) -> dict:
         "maximum_value": _parse_decimal(item.get("valorTotalHomologado")),
         "modality": MODALITY_MAP.get(modality_id),
         "dispute_mode": item.get("modoDisputaNome"),
+        "source_portal": _portal_from_url(item.get("linkSistemaOrigem") or item.get("linkProcessoEletronico")),
         "edital_url": item.get("linkSistemaOrigem") or item.get("linkProcessoEletronico"),
         "details_url": item.get("linkSistemaOrigem"),
         "last_scraped": datetime.utcnow(),
