@@ -27,7 +27,7 @@ async def list_portals(
     named, outros = [], 0
     for r in rows:
         p = (r.source_portal or "").strip()
-        if p.startswith("Outros") or len(named) >= TOP:
+        if not p or p.startswith("Outros") or len(named) >= TOP:
             outros += r.n
         else:
             named.append({"portal": p, "count": r.n})

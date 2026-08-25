@@ -42,6 +42,7 @@ _MAP = [
     ("bnccompras", "BNC"),
     ("licitardigital", "Licitar Digital"),
     ("licitamaisbrasil", "Licita Mais Brasil"),
+    ("licitama", "Licitama"),
     ("comprasbr", "ComprasBR"),
     ("sigep", "SIGEP"),
     ("comprasgovernamentais", "Compras.gov.br (Comprasnet)"),
@@ -82,7 +83,7 @@ async def backfill_portals(limit: int = 4000):
     de origem (edital_url/details_url). Roda em lote, seguro para reexecução."""
     import logging
     from datetime import datetime
-    from sqlmodel import select, or_
+    from sqlmodel import select, or_, and_
     from app.db.models import PublicBid, ScrapeLog, ScrapeStatus
     from app.database import AsyncSessionLocal
     log = logging.getLogger(__name__)
@@ -90,13 +91,17 @@ async def backfill_portals(limit: int = 4000):
     updated = 0
     try:
         async with AsyncSessionLocal() as session:
-            # pega sem etiqueta OU com etiqueta de dominio cru (contém ".") para
-            # reaplicar o mapa melhorado
+            # sem etiqueta, vazio, OU dominio cru (tem "." e não tem espaço — os
+            # nomeados como "Compras.gov.br (Comprasnet)" têm espaço e ficam de fora)
             rows = (await session.execute(
                 select(PublicBid).where(
                     PublicBid.source == "pncp",
-                    or_(PublicBid.source_portal == None,          # noqa: E711
-                        PublicBid.source_portal.like("%.%")),
+                    or_(
+                        PublicBid.source_portal == None,   # noqa: E711
+                        PublicBid.source_portal == "",
+                        and_(PublicBid.source_portal.like("%.%"),
+                             PublicBid.source_portal.notlike("% %")),
+                    ),
                 ).limit(limit)
             )).scalars().all()
             for b in rows:
