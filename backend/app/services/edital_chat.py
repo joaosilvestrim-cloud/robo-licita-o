@@ -91,8 +91,8 @@ async def ask_edital(text: str, question: str) -> str:
             )
             if resp.status_code != 200:
                 logger.warning(f"ask_edital groq {resp.status_code}: {resp.text[:300]}")
-                return f"[dbg {resp.status_code}] {resp.text[:220]}"
+                return "Não consegui consultar o edital agora. Tente de novo em instantes."
             return resp.json()["choices"][0]["message"]["content"] or "Não consegui responder."
     except Exception as e:
         logger.warning(f"ask_edital groq erro: {e}")
-        return f"[dbg exc] {type(e).__name__}: {str(e)[:200]}"
+        return "Não consegui consultar o edital agora. Tente de novo em instantes."

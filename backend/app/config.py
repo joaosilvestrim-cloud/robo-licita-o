@@ -46,7 +46,7 @@ class Settings(BaseSettings):
 
     # IA — Assistente Sonar via Groq (API compatível com OpenAI).
     groq_api_key: str = ""
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"   # llama-3.3 foi aposentado pelo Groq (ago/2026)
     groq_base_url: str = "https://api.groq.com/openai/v1"
     # Porta interna (Render injeta PORT) — usada pelo agente p/ chamar a própria API.
     port: int = 8003
