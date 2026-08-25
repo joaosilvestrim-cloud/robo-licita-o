@@ -282,6 +282,7 @@ class BidTracking(SQLModel, table=True):
     tenant_id: int = Field(foreign_key="proc_tenants.id")
     bid_id: int = Field(foreign_key="public_bids.id")
 
+    stage: str = Field(default="backlog", max_length=20)   # kanban: backlog/preparando/disputa/ganhou/perdeu
     participated: bool = Field(default=False)
     proposal_submitted: bool = Field(default=False)
     proposal_date: Optional[date] = Field(default=None)

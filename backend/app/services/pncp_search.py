@@ -36,6 +36,8 @@ TI_KEYWORDS = [
     "inteligência artificial", "machine learning", "ETL", "governança de dados",
     "sistema de informação", "desenvolvimento de software", "fábrica de software",
     "geoprocessamento", "business analytics", "engenharia de dados",
+    "sistema de gestão", "plataforma tecnológica", "sistema informatizado",
+    "solução tecnológica", "gestão em saúde",
 ]
 
 # id numérico de modalidade → enum  (mesma lógica do pncp.py)

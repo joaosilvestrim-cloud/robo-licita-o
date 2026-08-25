@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api/tracking", tags=["tracking"])
 
 
 class TrackingBody(BaseModel):
+    stage: Optional[str] = None
     participated: bool = False
     proposal_submitted: bool = False
     proposal_date: Optional[date] = None
@@ -47,7 +48,7 @@ async def start_tracking(
     tracking = BidTracking(
         tenant_id=user.tenant_id,
         bid_id=bid_id,
-        **body.model_dump(),
+        **body.model_dump(exclude_none=True),
     )
     session.add(tracking)
 
@@ -79,16 +80,29 @@ async def list_tracking(
     result = await session.execute(stmt)
     trackings = result.scalars().all()
 
+    today = date.today()
     out = []
     for t in trackings:
         bid = await session.get(PublicBid, t.bid_id)
+        # próximo prazo (tarefa não feita mais próxima) para o "aviso" no card
+        nt = (await session.execute(
+            select(BidTask).where(
+                BidTask.bid_id == t.bid_id, BidTask.tenant_id == user.tenant_id,
+                BidTask.done == False, BidTask.due_date != None,  # noqa: E711,E712
+            ).order_by(BidTask.due_date).limit(1)
+        )).scalar_one_or_none()
         out.append({
             "id": t.id,
             "bid_id": t.bid_id,
+            "stage": t.stage or "backlog",
             "bid_title": bid.title if bid else None,
             "bid_state": bid.state if bid else None,
+            "bid_modality": (bid.modality.value if bid and bid.modality else None),
             "bid_closing_date": bid.closing_date if bid else None,
             "bid_estimated_value": float(bid.estimated_value) if bid and bid.estimated_value else None,
+            "next_due": nt.due_date if nt else None,
+            "next_task": nt.title if nt else None,
+            "next_days": (nt.due_date - today).days if nt and nt.due_date else None,
             "participated": t.participated,
             "proposal_submitted": t.proposal_submitted,
             "proposal_value": float(t.proposal_value) if t.proposal_value else None,

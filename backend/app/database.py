@@ -116,6 +116,7 @@ async def init_db():
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_funding_external ON funding_opportunities(external_id)",
         "CREATE INDEX IF NOT EXISTS ix_funding_open ON funding_opportunities(is_open, is_ti, deadline)",
         "ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS winners_synced_at TIMESTAMP",
+        "ALTER TABLE bid_tracking ADD COLUMN IF NOT EXISTS stage VARCHAR(20) NOT NULL DEFAULT 'backlog'",
         "CREATE INDEX IF NOT EXISTS ix_tasks_tenant_bid ON bid_tasks(tenant_id, bid_id)",
         "CREATE INDEX IF NOT EXISTS ix_tasks_due ON bid_tasks(tenant_id, done, due_date)",
         "CREATE INDEX IF NOT EXISTS ix_bids_winsync ON public_bids(is_ti, status, winners_synced_at)",
