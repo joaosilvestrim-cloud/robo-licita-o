@@ -1,12 +1,13 @@
 from typing import Optional
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from app.database import get_session
-from app.db.models import BidTracking, PublicBid, User
+from app.db.models import BidTracking, BidTask, PublicBid, User
 from app.auth import get_current_user
+from app.services.bid_tasks import build_tasks
 
 router = APIRouter(prefix="/api/tracking", tags=["tracking"])
 
@@ -49,6 +50,11 @@ async def start_tracking(
         **body.model_dump(),
     )
     session.add(tracking)
+
+    # gera as tarefas do negócio com prazos a partir da abertura
+    for t in build_tasks(bid.opening_date):
+        session.add(BidTask(tenant_id=user.tenant_id, bid_id=bid_id, **t))
+
     await session.commit()
     await session.refresh(tracking)
     return tracking
@@ -136,4 +142,86 @@ async def stop_tracking(
     if not tracking:
         raise HTTPException(404, "Tracking não encontrado")
     await session.delete(tracking)
+    # remove também as tarefas do negócio
+    tasks = (await session.execute(
+        select(BidTask).where(BidTask.bid_id == bid_id, BidTask.tenant_id == user.tenant_id)
+    )).scalars().all()
+    for t in tasks:
+        await session.delete(t)
     await session.commit()
+
+
+def _task_dict(t: BidTask) -> dict:
+    return {
+        "id": t.id, "bid_id": t.bid_id, "section": t.section, "title": t.title,
+        "kind": t.kind, "due_date": t.due_date, "on_agenda": t.on_agenda,
+        "ordem": t.ordem, "done": t.done, "done_at": t.done_at,
+    }
+
+
+@router.get("/{bid_id}/tasks")
+async def get_tasks(
+    bid_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Tarefas do negócio (checklist com prazos) de uma licitação acompanhada."""
+    rows = (await session.execute(
+        select(BidTask).where(BidTask.bid_id == bid_id, BidTask.tenant_id == user.tenant_id)
+        .order_by(BidTask.ordem)
+    )).scalars().all()
+    return {"tasks": [_task_dict(t) for t in rows]}
+
+
+class TaskPatch(BaseModel):
+    done: bool
+
+
+@router.patch("/tasks/{task_id}")
+async def toggle_task(
+    task_id: int,
+    body: TaskPatch,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    task = (await session.execute(
+        select(BidTask).where(BidTask.id == task_id, BidTask.tenant_id == user.tenant_id)
+    )).scalar_one_or_none()
+    if not task:
+        raise HTTPException(404, "Tarefa não encontrada")
+    task.done = body.done
+    task.done_at = datetime.utcnow() if body.done else None
+    await session.commit()
+    return _task_dict(task)
+
+
+@router.get("/agenda/upcoming")
+async def agenda_upcoming(
+    days: int = Query(60, ge=1, le=365),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Agenda: marcos com prazo dentro da janela, das licitações acompanhadas."""
+    horizon = date.today() + timedelta(days=days)
+    rows = (await session.execute(
+        select(BidTask, PublicBid)
+        .join(PublicBid, PublicBid.id == BidTask.bid_id)
+        .where(
+            BidTask.tenant_id == user.tenant_id,
+            BidTask.done == False,  # noqa: E712
+            BidTask.due_date != None,  # noqa: E711
+            BidTask.due_date <= horizon,
+        )
+        .order_by(BidTask.due_date)
+    )).all()
+    today = date.today()
+    out = []
+    for t, b in rows:
+        out.append({
+            **_task_dict(t),
+            "bid_title": b.title,
+            "state": b.state,
+            "days_left": (t.due_date - today).days if t.due_date else None,
+            "overdue": bool(t.due_date and t.due_date < today),
+        })
+    return {"data": out, "total": len(out)}

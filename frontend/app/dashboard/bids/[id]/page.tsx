@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, ExternalLink, BookmarkPlus, FileText, Building2,
@@ -130,6 +130,7 @@ export default function BidDetailPage() {
   const [files,   setFiles]   = useState<any[]>([]);   // documentos
   const [loading, setLoading] = useState(true);
   const [tracking, setTracking] = useState(false);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [elig, setElig] = useState<any>(null);   // análise de aderência (Candidatura Assistida)
   const [comp, setComp] = useState<any>(null);   // inteligência de concorrência (quem venceu)
 
@@ -189,6 +190,25 @@ export default function BidDetailPage() {
       .catch(() => {});
   }, [bid?.id, bid?.status, token]);
 
+  const loadTasks = useCallback(() => {
+    if (!bid?.id || !token) return;
+    fetch(`${API}/api/tracking/${bid.id}/tasks`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.tasks) setTasks(d.tasks); })
+      .catch(() => {});
+  }, [bid?.id, token]);
+
+  useEffect(() => { loadTasks(); }, [loadTasks]);
+
+  function toggleTask(taskId: number, done: boolean) {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, done } : t));
+    fetch(`${API}/api/tracking/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ done }),
+    }).catch(() => {});
+  }
+
   async function startTracking() {
     setTracking(true);
     const res = await fetch(`${API}/api/tracking/${bid.id}`, {
@@ -197,7 +217,8 @@ export default function BidDetailPage() {
       body: "{}",
     });
     const d = await res.json().catch(() => ({}));
-    alert(res.ok ? "Adicionado ao acompanhamento!" : (d.detail ?? "Erro."));
+    if (res.ok) loadTasks();
+    alert(res.ok ? "Adicionado aos seus negócios! As tarefas com prazo já estão na lista." : (d.detail ?? "Erro."));
     setTracking(false);
   }
 
@@ -250,9 +271,9 @@ export default function BidDetailPage() {
               <FileText size={14} /> Edital
             </a>
           )}
-          <button onClick={startTracking} disabled={tracking}
+          <button onClick={startTracking} disabled={tracking || tasks.length > 0}
             className="flex items-center gap-2 px-4 py-1.5 bg-proc-500 hover:bg-proc-600 text-white rounded-xl text-sm font-medium transition disabled:opacity-60">
-            <BookmarkPlus size={14} /> {tracking ? "Aguarde…" : "Acompanhar"}
+            <BookmarkPlus size={14} /> {tasks.length > 0 ? "Nos seus negócios" : tracking ? "Aguarde…" : "Adicionar aos meus negócios"}
           </button>
         </div>
       </div>
@@ -388,6 +409,53 @@ export default function BidDetailPage() {
             </div>
           );
         })()}
+
+        {/* Negócio — tarefas com prazos (gerado ao adicionar aos negócios) */}
+        {tasks.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+            <div className="bg-slate-900 px-6 py-3 flex items-center gap-2 text-white">
+              <CheckCircle size={16} />
+              <span className="text-sm font-semibold">Tarefas do negócio</span>
+              <span className="text-[11px] text-white/60 ml-1">prazos em dias úteis a partir da abertura</span>
+              <span className="ml-auto text-[11px] text-white/70">{tasks.filter(t => t.done).length}/{tasks.length} feitas</span>
+            </div>
+            <div className="p-4 space-y-4">
+              {["Preparação", "Disputa", "Pós-disputa"].map(sec => {
+                const secTasks = tasks.filter(t => t.section === sec);
+                if (secTasks.length === 0) return null;
+                return (
+                  <div key={sec}>
+                    <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">{sec}</div>
+                    <div className="space-y-1">
+                      {secTasks.map(t => {
+                        const dl = t.due_date ? new Date(t.due_date + "T00:00:00") : null;
+                        const overdue = dl && !t.done && dl < new Date(new Date().toDateString());
+                        return (
+                          <label key={t.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+                            <input type="checkbox" checked={t.done} onChange={e => toggleTask(t.id, e.target.checked)}
+                              className="w-4 h-4 rounded accent-proc-500 shrink-0" />
+                            <span className={`flex-1 text-sm ${t.done ? "line-through text-slate-400" : "text-slate-700"}`}>
+                              {t.title}
+                              {t.on_agenda && <span className="ml-2 text-[9px] font-bold text-amber-600 bg-amber-50 px-1 py-0.5 rounded uppercase">marco</span>}
+                            </span>
+                            {t.due_date && (
+                              <span className={`text-xs whitespace-nowrap flex items-center gap-1 ${overdue ? "text-red-600 font-semibold" : "text-slate-400"}`}>
+                                <Clock size={11} /> {fmtDate(t.due_date)}
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              <p className="text-[11px] text-slate-400 pt-1 border-t border-slate-50">
+                Prazos estimados em dias úteis (sem feriados). O prazo final vale o do edital. Impugnação/esclarecimento: até 3 dias úteis antes (art. 164). Recursos: art. 165.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Concorrência — quem venceu (dados públicos do PNCP após homologação) */}
         {comp && (() => {

@@ -534,3 +534,25 @@ class BidWinner(SQLModel, table=True):
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class BidTask(SQLModel, table=True):
+    """Tarefa do 'negócio': etapa a cumprir numa licitação acompanhada, com prazo
+    calculado a partir da data de abertura (dias úteis). Gerado ao acompanhar."""
+    __tablename__ = "bid_tasks"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: int = Field(foreign_key="proc_tenants.id", index=True)
+    bid_id: int = Field(foreign_key="public_bids.id", index=True)
+
+    section: str = Field(max_length=40)          # Preparação, Disputa, Pós-disputa...
+    title: str = Field(max_length=200)
+    kind: str = Field(max_length=40)             # esclarecimento, impugnacao, disputa, recurso...
+    due_date: Optional[date] = Field(default=None)
+    on_agenda: bool = Field(default=False)       # entra na agenda (marcos principais)
+    ordem: int = Field(default=0)
+
+    done: bool = Field(default=False)
+    done_at: Optional[datetime] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)

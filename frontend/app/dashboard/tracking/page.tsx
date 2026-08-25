@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { BookmarkCheck, CheckCircle, XCircle, Clock, ExternalLink } from "lucide-react";
+import { BookmarkCheck, CheckCircle, XCircle, Clock, ExternalLink, CalendarClock } from "lucide-react";
 import BidDrawer from "../../components/BidDrawer";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -24,6 +24,15 @@ export default function TrackingPage() {
   const [editing, setEditing] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
   const [selectedBidId, setSelectedBidId] = useState<number | null>(null);
+  const [agenda, setAgenda] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API}/api/tracking/agenda/upcoming?days=90`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.data) setAgenda(d.data); })
+      .catch(() => {});
+  }, [token, items]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,6 +91,33 @@ export default function TrackingPage() {
           {total} licitações · {participated} participadas · {won} ganhas
         </p>
       </div>
+
+      {/* Agenda: próximos prazos dos negócios */}
+      {agenda.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden mb-6">
+          <div className="bg-slate-900 px-5 py-3 flex items-center gap-2 text-white">
+            <CalendarClock size={16} />
+            <span className="text-sm font-semibold">Agenda de prazos</span>
+            <span className="text-[11px] text-white/60 ml-1">marcos e tarefas a vencer</span>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {agenda.slice(0, 8).map(a => (
+              <div key={a.id} className="flex items-center gap-3 px-5 py-2.5">
+                <span className={`text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap ${
+                  a.overdue ? "bg-red-100 text-red-700" : a.days_left <= 3 ? "bg-amber-100 text-amber-700" : "bg-proc-50 text-proc-700"
+                }`}>
+                  {a.overdue ? "atrasada" : a.days_left === 0 ? "hoje" : `em ${a.days_left}d`}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-slate-800">{a.title}{a.on_agenda && <span className="ml-1.5 text-[9px] font-bold text-amber-600">MARCO</span>}</div>
+                  <div className="text-[11px] text-slate-400 truncate">{a.bid_title}</div>
+                </div>
+                <span className="text-xs text-slate-400 flex items-center gap-1 whitespace-nowrap"><Clock size={11} /> {a.due_date?.split("-").reverse().join("/")}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filter */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-6">
