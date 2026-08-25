@@ -130,6 +130,13 @@ PROCUREMENT_TOOLS = [
         }, "required": []},
     }},
     {"type": "function", "function": {
+        "name": "explain_legal_action",
+        "description": "Explica uma manifestação jurídica da licitação (impugnação, esclarecimento, intenção de recurso, recurso, contrarrazão) com prazo da Lei 14.133.",
+        "parameters": {"type": "object", "properties": {
+            "action_name": {"type": "string"},
+        }, "required": ["action_name"]},
+    }},
+    {"type": "function", "function": {
         "name": "explain_modality",
         "description": "Explica uma modalidade de licitação (conhecimento jurídico local)",
         "parameters": {"type": "object", "properties": {
@@ -185,6 +192,27 @@ async def _call_api(path: str, method: str = "GET", params: dict = None,
             resp = await client.request(method, url, json=body, headers=headers)
         resp.raise_for_status()
         return resp.json()
+
+
+LEGAL_EXPLANATIONS = {
+    "esclarecimento": "Esclarecimento (Lei 14.133/2021, art. 164): pergunta formal ao órgão para tirar dúvidas sobre o edital, escopo, documentação ou critérios. Não é contestação. Prazo: até 3 dias úteis antes da abertura.",
+    "impugnacao": "Impugnação (art. 164): questiona regra do edital ilegal, restritiva ou inadequada (ex.: exigência técnica excessiva). Prazo: até 3 dias úteis antes da abertura.",
+    "impugnação": "Impugnação (art. 164): questiona regra do edital ilegal, restritiva ou inadequada. Prazo: até 3 dias úteis antes da abertura.",
+    "intencao de recurso": "Intenção de recurso: aviso de que pretende recorrer, manifestado ainda na sessão logo após a decisão (julgamento/habilitação), sob pena de preclusão.",
+    "recurso": "Recurso (art. 165): documento com argumentos e provas para modificar a decisão. Prazo: 3 dias úteis após a intenção.",
+    "contrarrazao": "Contrarrazão (art. 165): resposta ao recurso de outro licitante, para defender sua classificação. Prazo: 3 dias úteis após o recurso.",
+    "contrarrazão": "Contrarrazão (art. 165): resposta ao recurso de outro licitante. Prazo: 3 dias úteis após o recurso.",
+}
+
+
+def _explain_legal_local(name: str) -> str:
+    n = (name or "").lower().strip()
+    for key, exp in LEGAL_EXPLANATIONS.items():
+        if key in n or n in key:
+            return exp
+    return ("As manifestações da Lei 14.133/2021 são: esclarecimento e impugnação (art. 164, "
+            "até 3 dias úteis antes da abertura); intenção de recurso (na sessão); recurso e "
+            "contrarrazão (art. 165, 3 dias úteis). Veja a tela Jurídico.")
 
 
 def _explain_modality_local(name: str) -> str:
@@ -251,6 +279,8 @@ async def execute_tool(name: str, args: dict, user_token: str = None) -> str:
             return json.dumps(await _call_api("/api/winners", params=params, token=user_token), ensure_ascii=False, default=str)
         if name == "explain_modality":
             return json.dumps({"explanation": _explain_modality_local(args.get("modality_name", ""))}, ensure_ascii=False)
+        if name == "explain_legal_action":
+            return json.dumps({"explanation": _explain_legal_local(args.get("action_name", ""))}, ensure_ascii=False)
         if name == "suggest_keywords":
             return json.dumps({"suggestion": _suggest_keywords_local(args.get("cnae_description", ""))}, ensure_ascii=False)
         return json.dumps({"error": f"Ferramenta '{name}' não encontrada"})
