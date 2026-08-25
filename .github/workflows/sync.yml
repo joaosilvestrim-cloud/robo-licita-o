@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       source:
-        description: "Fonte para sync manual (pncp, comprasnet, dou, contratos, fomento, winners, keywords, alerts, all)"
+        description: "Fonte para sync manual (pncp, comprasnet, dou, contratos, fomento, winners, keywords, ti_keywords, alerts, all)"
         required: false
         default: "pncp"
       days_back:
@@ -64,6 +64,7 @@ jobs:
           elif [ "$SCHEDULE" = "0 3,15 * * *" ]; then
             call "dou" "3"
             call "keywords"
+            call "ti_keywords"
           elif [ "$SCHEDULE" = "0 2 * * *" ]; then
             call "close-expired"
           elif [ "$SCHEDULE" = "45 */8 * * *" ]; then

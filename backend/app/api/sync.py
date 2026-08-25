@@ -10,7 +10,7 @@ from app.services.pncp import sync_pncp, sync_pncp_proposta, reindex_ti
 from app.services.pncp_contratos import sync_contratos
 from app.services.fomento import sync_fomento
 from app.services.winners import sync_winners
-from app.services.pncp_search import sync_keyword, sync_all_profile_keywords
+from app.services.pncp_search import sync_keyword, sync_all_profile_keywords, sync_ti_keywords
 from app.services.alerts import process_alerts
 from app.services.comprasnet import sync_comprasnet
 from app.services.bec_sp import sync_bec_sp
@@ -158,6 +158,7 @@ async def trigger_source_sync(
         "bnc":                      (sync_bnc,                       {"days_back": days_back}),
         "alerts":      (process_alerts,       {}),
         "keywords":    (sync_all_profile_keywords, {}),
+        "ti_keywords": (sync_ti_keywords,     {}),
     }
     if source not in SOURCE_MAP:
         return {"error": f"Fonte '{source}' não suportada. Disponíveis: {', '.join(SOURCE_MAP)}"}

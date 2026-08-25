@@ -20,6 +20,24 @@ logger = logging.getLogger(__name__)
 PNCP_SEARCH_URL = "https://pncp.gov.br/api/search"
 PNCP_DETAIL_URL = "https://pncp.gov.br/api/consulta/v1/orgaos/{cnpj}/compras/{ano}/{seq}"
 
+# O /api/search do PNCP DERRUBA a conexão sem User-Agent de browser. Sem isso a
+# busca por palavra-chave falha em produção. Mantemos o UA em todas as chamadas.
+_UA = {
+    "Accept": "application/json",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+}
+
+# Termos de TI/dados que a DriveData quer caçar no PNCP inteiro (não só nas
+# publicações recentes). A busca full-text acha por qualquer data.
+TI_KEYWORDS = [
+    "business intelligence", "power bi", "análise de dados", "ciência de dados",
+    "dashboard", "data warehouse", "big data", "banco de dados",
+    "inteligência artificial", "machine learning", "ETL", "governança de dados",
+    "sistema de informação", "desenvolvimento de software", "fábrica de software",
+    "geoprocessamento", "business analytics", "engenharia de dados",
+]
+
 # id numérico de modalidade → enum  (mesma lógica do pncp.py)
 MODALITY_ID_MAP = MODALITY_MAP
 
@@ -57,7 +75,7 @@ async def _fetch_detail(client: httpx.AsyncClient, cnpj: str, ano: str, seq: str
     """Busca detalhes completos de uma licitação pelo CNPJ/ano/sequencial."""
     try:
         url = PNCP_DETAIL_URL.format(cnpj=cnpj, ano=ano, seq=seq)
-        resp = await client.get(url, headers={"Accept": "application/json"})
+        resp = await client.get(url, headers=_UA)
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:
@@ -171,7 +189,7 @@ async def sync_keyword(keyword: str, max_pages: int = 4) -> tuple[int, int, int]
                         "pagina": page,
                         "tam_pagina": 20,
                     },
-                    headers={"Accept": "application/json"},
+                    headers=_UA,
                 )
                 resp.raise_for_status()
                 data = resp.json()
@@ -298,4 +316,33 @@ async def sync_all_profile_keywords() -> dict:
         session.add(log)
         await session.commit()
 
+    return results
+
+
+async def sync_ti_keywords(max_pages: int = 3) -> dict:
+    """Varre o PNCP inteiro pelos termos de TI/dados da DriveData (TI_KEYWORDS).
+    Independe dos perfis e da data — acha licitações de qualquer portal de origem
+    (Betha, Comprasnet, BLL...) porque todas publicam no PNCP por lei."""
+    start = datetime.utcnow()
+    results: dict[str, tuple] = {}
+    for kw in TI_KEYWORDS:
+        try:
+            found, ins, upd = await sync_keyword(kw, max_pages=max_pages)
+            results[kw] = (found, ins, upd)
+            logger.info(f"ti_keyword '{kw}': found={found} ins={ins} upd={upd}")
+        except Exception as e:
+            logger.warning(f"ti_keyword '{kw}' erro: {e}")
+            results[kw] = (0, 0, 0)
+
+    tf = sum(r[0] for r in results.values())
+    ti = sum(r[1] for r in results.values())
+    tu = sum(r[2] for r in results.values())
+    async with AsyncSessionLocal() as session:
+        session.add(ScrapeLog(
+            source="ti_keywords", start_time=start, end_time=datetime.utcnow(),
+            status=ScrapeStatus.sucesso, records_found=tf,
+            records_inserted=ti, records_updated=tu,
+        ))
+        await session.commit()
+    logger.info(f"ti_keywords total: found={tf} ins={ti} upd={tu}")
     return results
