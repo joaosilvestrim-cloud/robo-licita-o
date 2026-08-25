@@ -135,23 +135,29 @@ async def init_db():
 
     # 3) seeds idempotentes (INSERT ON CONFLICT — sem lock exclusivo de tabela)
     async with engine.begin() as conn:
-        # seed das fontes de dados
+        # seed das fontes de dados REAIS (as que efetivamente trazem dados)
         await conn.execute(text("""
             INSERT INTO data_sources (key, name, description, official_url, active, created_at)
             VALUES
-              ('pncp',                    'PNCP',                        'Portal Nacional de Contratações Públicas — fonte oficial da Lei 14.133/2021',          'https://pncp.gov.br',                               true, NOW()),
-              ('comprasnet',              'ComprasNet/SIASG',            'Sistema federal de compras — histórico rico da Lei 8.666, ainda em operação',          'https://compras.dados.gov.br',                      true, NOW()),
-              ('licitacoes_e',            'Licitações-e (BB)',           'Banco do Brasil — pregões de municípios e estados não integrados ao PNCP',             'https://www.licitacoes-e.com.br',                   true, NOW()),
-              ('bec_sp',                  'BEC/SP',                      'Bolsa Eletrônica de Compras de SP — maior mercado comprador estadual',                 'https://www.bec.sp.gov.br',                         true, NOW()),
-              ('dou',                     'DOU / Querido Diário',        'Diários oficiais municipais — avisos que antecedem entrada nos portais (OKBR)',        'https://queridodiario.ok.org.br',                   true, NOW()),
-              ('licitacoes_e2_bb',        'Licitações-e2 BB',            'Banco do Brasil — portal v2 de licitações (licitacoes-e2.bb.com.br)',                  'https://licitacoes-e2.bb.com.br',                   true, NOW()),
-              ('portal_compras_publicas', 'Portal de Compras Públicas',  'plataforma privada usada por municípios de MG, SP e outros (API REST)',                'https://www.portaldecompraspublicas.com.br',         true, NOW()),
-              ('e_lic_sc',               'e-lic SC',                    'Portal de Licitações Eletrônicas de Santa Catarina (e-lic.sc.gov.br)',                  'https://e-lic.sc.gov.br',                           true, NOW()),
-              ('celic_rs',               'CELIC RS',                    'Central de Licitações do Estado do RS (celic.rs.gov.br)',                               'https://www.celic.rs.gov.br',                       true, NOW()),
-              ('comprasnet_ba',           'ComprasNet Bahia',            'Portal estadual de compras da Bahia (comprasnet.ba.gov.br)',                            'https://www.comprasnet.ba.gov.br',                  true, NOW()),
-              ('compra_aberta',           'Compra Aberta',               'Plataforma privada Compra Aberta usada por municípios SP/Sul (compraaberta.com.br)',    'https://compraaberta.com.br',                       true, NOW()),
-              ('bnc',                     'BNC',                         'Banco Nacional de Compras — usado por Sorocaba, Mauá e centenas de municípios SP/Sul',   'https://bnc.org.br',                                true, NOW())
+              ('pncp',            'PNCP',                              'Portal Nacional de Contratações Públicas — hub oficial da Lei 14.133/2021. Todos os portais (Comprasnet, Betha, BLL, Licitações-e...) publicam aqui.', 'https://pncp.gov.br',        true, NOW()),
+              ('ti_keywords',     'PNCP — Busca TI & Dados',           'Varredura full-text de termos de TI/BI/dados no PNCP inteiro.',                                                                                        'https://pncp.gov.br',        true, NOW()),
+              ('pncp_contratos',  'PNCP — Contratos (Recontratação)',  'Contratos de TI vencendo, para chegar antes na renovação.',                                                                                            'https://pncp.gov.br',        true, NOW()),
+              ('dou',             'DOU / Querido Diário',              'Diários oficiais municipais (OKBR) — avisos oficiais.',                                                                                                'https://queridodiario.ok.org.br', true, NOW()),
+              ('fomento',         'FAPESP — Fomento',                  'Chamadas de fomento à inovação (PIPE) da FAPESP.',                                                                                                     'https://fapesp.br/chamadas', true, NOW())
             ON CONFLICT (key) DO NOTHING
+        """))
+        # garante o estado correto das fontes reais (ON CONFLICT não atualiza)
+        await conn.execute(text("""
+            UPDATE data_sources SET active = true
+            WHERE key IN ('pncp','ti_keywords','pncp_contratos','dou','fomento')
+        """))
+        # desativa fontes mortas/redundantes — todas publicam no PNCP, então são
+        # cobertas pelo hub. Ficam no banco (histórico) mas fora da tela e do cron.
+        await conn.execute(text("""
+            UPDATE data_sources SET active = false
+            WHERE key IN ('comprasnet','licitacoes_e','bec_sp','licitacoes_e2_bb',
+                          'portal_compras_publicas','e_lic_sc','celic_rs','comprasnet_ba',
+                          'compra_aberta','bnc')
         """))
 
         # seed dos portais municipais mapeados no arquivo MD
