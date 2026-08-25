@@ -99,6 +99,8 @@ async def init_db():
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_bid_interactions_user_bid ON bid_interactions(user_id, bid_id)",
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_public_bids_source_external ON public_bids(source, external_id)",
         "ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS is_ti BOOLEAN",
+        "ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS dispute_mode VARCHAR(40)",
+        "CREATE INDEX IF NOT EXISTS ix_bids_dispute ON public_bids(dispute_mode)",
         "ALTER TABLE public_bids ADD COLUMN IF NOT EXISTS ti_score INTEGER",
         "CREATE INDEX IF NOT EXISTS ix_bids_ti ON public_bids(is_ti, ti_score)",
         "CREATE INDEX IF NOT EXISTS ix_bids_status ON public_bids(status)",

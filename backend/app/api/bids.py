@@ -121,7 +121,8 @@ async def bid_geo_stats(
 def _apply_filters(stmt, sphere, state, city, branch, status, modality,
                    min_value, max_value, days_before_closing, q,
                    only_open_for_proposals: bool = False,
-                   object_type: Optional[ObjectType] = None):
+                   object_type: Optional[ObjectType] = None,
+                   dispute_mode: Optional[str] = None):
     if sphere:
         stmt = stmt.where(PublicBid.sphere == sphere)
     if state:
@@ -163,6 +164,8 @@ def _apply_filters(stmt, sphere, state, city, branch, status, modality,
         )
     if object_type:
         stmt = stmt.where(PublicBid.object_type == object_type)
+    if dispute_mode:
+        stmt = stmt.where(PublicBid.dispute_mode.ilike(dispute_mode.strip()))
     if q:
         term = f"%{_fold_py(q)}%"
         stmt = stmt.where(
@@ -188,6 +191,7 @@ async def list_bids(
     days_before_closing: Optional[int] = None,
     only_open_for_proposals: bool = Query(False, description="Só licitações com prazo ainda aberto"),
     object_type: Optional[ObjectType] = Query(None, description="Tipo do objeto: bem, servico, obra, consultoria, misto"),
+    dispute_mode: Optional[str] = Query(None, description="Modo de disputa: Aberto, Fechado, Aberto-Fechado, Fechado-Aberto, Dispensa Com Disputa"),
     q: Optional[str] = None,
     sort_by: str = Query("closing_date", regex="^(closing_date|estimated_value|publication_date|opening_date|title|state|status)$"),
     sort_dir: str = Query("asc", regex="^(asc|desc)$"),
@@ -199,7 +203,7 @@ async def list_bids(
     stmt = select(PublicBid)
     stmt = _apply_filters(stmt, sphere, state, city, branch, status, modality,
                           min_value, max_value, days_before_closing, q,
-                          only_open_for_proposals, object_type)
+                          only_open_for_proposals, object_type, dispute_mode)
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await session.execute(count_stmt)).scalar_one()
@@ -632,6 +636,7 @@ def _bid_summary(b: PublicBid) -> dict:
         "organ_name": b.organ_name,
         "status": b.status,
         "modality": b.modality,
+        "dispute_mode": b.dispute_mode,
         "object_type": b.object_type,
         "branch_name": b.branch_name,
         "estimated_value": float(b.estimated_value) if b.estimated_value else None,

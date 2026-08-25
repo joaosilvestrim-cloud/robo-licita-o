@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, ExternalLink, BookmarkPlus, FileText, Building2,
   Calendar, DollarSign, Tag, Phone, Mail, AlertCircle,
-  Package, Download, Globe, CheckCircle, Clock, XCircle, Users, Trophy, Lock, ChevronRight, TrendingDown,
+  Package, Download, Globe, CheckCircle, Clock, XCircle, Users, Trophy, Lock, ChevronRight, TrendingDown, Gavel, Info,
 } from "lucide-react";
 
 // situação do licitante no resultado (estilo "análise dos licitantes")
@@ -54,6 +54,30 @@ const MODALITY_LABEL: Record<string, string> = {
   tomada_preco: "Tomada de Preços", convite: "Convite",
   dispensa: "Dispensa de Licitação", inexigibilidade: "Inexigibilidade",
   leilao: "Leilão", dialogo_competitivo: "Diálogo Competitivo",
+};
+
+// Modo de disputa (PNCP): como os fornecedores apresentam os preços + o cuidado estratégico
+const DISPUTE_INFO: Record<string, { resumo: string; cuidado: string }> = {
+  "aberto": {
+    resumo: "Leilão ao contrário: lances visíveis e sucessivamente menores, com prorrogações previstas no edital.",
+    cuidado: "Defina seu preço mínimo antes. É o mais transparente, mas a disputa por preço fica agressiva.",
+  },
+  "fechado": {
+    resumo: "Cada empresa envia uma proposta sigilosa. As propostas abrem simultaneamente e vence a melhor pelo critério do edital.",
+    cuidado: "Apresente seu melhor preço já de início. Não cabe em julgamento por menor preço/maior desconto (art. 56, Lei 14.133).",
+  },
+  "aberto-fechado": {
+    resumo: "Primeiro a disputa aberta; depois os melhores classificados (faixa de ~10%) dão um lance final sigiloso.",
+    cuidado: "Guarde margem para a rodada final. Não reduza demais na fase aberta (IN SEGES/ME 73/2022, art. 24).",
+  },
+  "fechado-aberto": {
+    resumo: "Propostas iniciais sigilosas; classificam-se as melhores (faixa de ~10%) e só elas vão à fase aberta de lances.",
+    cuidado: "Comece competitivo: se a proposta inicial vier alta, você nem avança para a disputa (art. 25).",
+  },
+  "dispensa com disputa": {
+    resumo: "Contratação direta por dispensa, mas com disputa eletrônica de propostas para buscar o melhor preço.",
+    cuidado: "Bom para a DriveData: contratos menores, processo rápido, porta de entrada em novos órgãos. Confira habilitação e prazo curto.",
+  },
 };
 
 // ─── extrai cnpj/tipo/ano/seq do external_id ─────────────────────────────────
@@ -251,6 +275,11 @@ export default function BidDetailPage() {
                 {SPHERE_LABEL[bid.sphere] ?? bid.sphere}
               </span>
             )}
+            {bid.dispute_mode && bid.dispute_mode.toLowerCase() !== "não se aplica" && (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
+                Disputa: {bid.dispute_mode}
+              </span>
+            )}
             {bid.source && (
               <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-400 uppercase tracking-widest ml-auto">
                 {bid.source}
@@ -264,6 +293,21 @@ export default function BidDetailPage() {
             <p className="text-sm text-slate-500 leading-relaxed mb-4 bg-slate-50 rounded-xl p-4 border border-slate-100">
               {description}
             </p>
+          )}
+
+          {/* Modo de disputa: como os fornecedores apresentam os preços + estratégia */}
+          {bid.dispute_mode && DISPUTE_INFO[bid.dispute_mode.toLowerCase()] && (
+            <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Gavel size={15} className="text-indigo-600" />
+                <span className="text-sm font-semibold text-indigo-900">Modo de disputa: {bid.dispute_mode}</span>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">{DISPUTE_INFO[bid.dispute_mode.toLowerCase()].resumo}</p>
+              <div className="flex items-start gap-1.5 mt-2 text-xs text-indigo-800">
+                <Info size={13} className="shrink-0 mt-0.5" />
+                <span><b>Estratégia:</b> {DISPUTE_INFO[bid.dispute_mode.toLowerCase()].cuidado}</span>
+              </div>
+            </div>
           )}
 
           {/* Valores em destaque */}

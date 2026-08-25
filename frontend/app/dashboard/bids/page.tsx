@@ -101,6 +101,7 @@ export default function BidsPage() {
   const [onlyOpenForProposals, setOnlyOpenForProposals] = useState(true);
   const [itMode, setItMode]         = useState(false);
   const [modality, setModality]     = useState("");
+  const [disputeMode, setDisputeMode] = useState("");
   const [minValue, setMinValue]     = useState("");
   const [maxValue, setMaxValue]     = useState("");
   const [daysBefore, setDaysBefore] = useState("");
@@ -147,6 +148,7 @@ export default function BidsPage() {
     if (clean(state))  params.set("state", clean(state).toUpperCase());
     if (clean(city))   params.set("city", clean(city));
     if (clean(modality)) params.set("modality", clean(modality));
+    if (clean(disputeMode)) params.set("dispute_mode", clean(disputeMode));
     if (minValue)      params.set("min_value", minValue);
     if (maxValue)      params.set("max_value", maxValue);
     if (daysBefore)    params.set("days_before_closing", daysBefore);
@@ -167,7 +169,7 @@ export default function BidsPage() {
       setTotal(data.total ?? 0);
     } catch {}
     setLoading(false);
-  }, [page, q, sphere, state, city, modality, minValue, maxValue, daysBefore, sortBy, sortDir, selectedStatus, onlyOpenForProposals, itMode, token]);
+  }, [page, q, sphere, state, city, modality, disputeMode, minValue, maxValue, daysBefore, sortBy, sortDir, selectedStatus, onlyOpenForProposals, itMode, token]);
 
   function toggleSort(col: string) {
     if (sortBy === col) {
@@ -322,6 +324,16 @@ export default function BidsPage() {
                 <option value="inexigibilidade">Inexigibilidade</option>
                 <option value="dialogo_competitivo">Diálogo Competitivo</option>
                 <option value="leilao">Leilão</option>
+              </select>
+              <select value={disputeMode} onChange={e => { setDisputeMode(e.target.value); setPage(1); }}
+                title="Modo de disputa: como os fornecedores apresentam os preços"
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-proc-400">
+                <option value="">Todos modos de disputa</option>
+                <option value="Aberto">Aberto (lances visíveis)</option>
+                <option value="Fechado">Fechado (proposta sigilosa)</option>
+                <option value="Aberto-Fechado">Aberto-Fechado</option>
+                <option value="Fechado-Aberto">Fechado-Aberto</option>
+                <option value="Dispensa Com Disputa">Dispensa com disputa</option>
               </select>
               <input type="number" value={minValue} min="0" step="1000"
                 onChange={e => { setMinValue(e.target.value); setPage(1); }}

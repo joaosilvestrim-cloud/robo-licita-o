@@ -174,6 +174,7 @@ class PublicBid(SQLModel, table=True):
     estimated_value: Optional[Decimal] = Field(default=None, decimal_places=2, max_digits=15)
     maximum_value: Optional[Decimal] = Field(default=None, decimal_places=2, max_digits=15)
     modality: Optional[BidModality] = Field(default=None)
+    dispute_mode: Optional[str] = Field(default=None, max_length=40)   # modoDisputaNome do PNCP
 
     # Requisitos
     min_patrimony: Optional[Decimal] = Field(default=None, decimal_places=2, max_digits=15)

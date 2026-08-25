@@ -52,6 +52,7 @@ PROCUREMENT_TOOLS = [
             "state": {"type": "string", "description": "UF, ex: SP, RJ, MG"},
             "city": {"type": "string"},
             "status": {"type": "string", "enum": ["aberta", "andamento", "encerrada", "programada"]},
+            "dispute_mode": {"type": "string", "description": "Modo de disputa: Aberto, Fechado, Aberto-Fechado, Fechado-Aberto, Dispensa Com Disputa"},
             "limit": {"type": "integer", "default": 10},
             "min_value": {"type": "number"},
             "max_value": {"type": "number"},

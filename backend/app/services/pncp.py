@@ -121,6 +121,7 @@ def _map_bid(item: dict, source_key: str) -> dict:
         "estimated_value": _parse_decimal(item.get("valorTotalEstimado")),
         "maximum_value": _parse_decimal(item.get("valorTotalHomologado")),
         "modality": MODALITY_MAP.get(modality_id),
+        "dispute_mode": item.get("modoDisputaNome"),
         "edital_url": item.get("linkSistemaOrigem") or item.get("linkProcessoEletronico"),
         "details_url": item.get("linkSistemaOrigem"),
         "last_scraped": datetime.utcnow(),
