@@ -28,6 +28,24 @@ from app.cron.jobs import run_all_sources_sync
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 
 
+@router.get("/groq-models")
+async def groq_models(_: User = Depends(get_current_user)):
+    """Diagnóstico: lista os modelos disponíveis no Groq para a nossa chave."""
+    import httpx
+    from app.config import settings
+    if not settings.groq_api_key:
+        return {"error": "sem chave groq", "current": settings.groq_model}
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.get(f"{settings.groq_base_url}/models",
+                                 headers={"Authorization": f"Bearer {settings.groq_api_key}"})
+            data = r.json()
+        ids = sorted([m.get("id") for m in (data.get("data") or []) if m.get("id")])
+        return {"current": settings.groq_model, "available": ids}
+    except Exception as e:
+        return {"error": str(e)[:200], "current": settings.groq_model}
+
+
 @router.post("")
 async def trigger_full_sync(
     background_tasks: BackgroundTasks,
