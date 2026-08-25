@@ -142,11 +142,14 @@ export default function TrackingPage() {
                 onDragLeave={() => setOverCol(c => c === col.key ? null : c)}
                 onDrop={() => { const it = items.find(i => i.bid_id === dragId); if (it) moveStage(it, col.key); setDragId(null); setOverCol(null); }}
                 className={`shrink-0 w-72 rounded-2xl border transition ${overCol === col.key ? "border-proc-300 bg-proc-50/40" : "border-slate-100 bg-slate-50/60"}`}>
-                <div className="px-4 py-3 flex items-center gap-2 sticky top-0">
+                <div className="px-4 pt-3 pb-1 flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${col.dot}`} />
                   <span className="text-sm font-semibold text-slate-700">{col.label}</span>
                   <span className="text-xs text-slate-400">{colItems.length}</span>
-                  {col.hint && <span className="text-[10px] text-slate-400 ml-auto">{col.hint}</span>}
+                  {(() => {
+                    const soma = colItems.reduce((s, i) => s + (i.bid_estimated_value || 0), 0);
+                    return soma > 0 ? <span className="ml-auto text-[11px] text-slate-500 font-medium">{fmt(soma)}</span> : (col.hint ? <span className="ml-auto text-[10px] text-slate-400">{col.hint}</span> : null);
+                  })()}
                 </div>
                 <div className="px-2 pb-3 space-y-2 min-h-[120px]">
                   {colItems.map(item => (

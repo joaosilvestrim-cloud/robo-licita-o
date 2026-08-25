@@ -5,7 +5,7 @@ import {
   ArrowLeft, ExternalLink, BookmarkPlus, FileText, Building2,
   Calendar, DollarSign, Tag, Phone, Mail, AlertCircle,
   Package, Download, Globe, CheckCircle, Clock, XCircle, Users, Trophy, Lock, ChevronRight, TrendingDown, Gavel, Info,
-  MessageSquare, Send, Loader2, Sparkles,
+  MessageSquare, Send, Loader2, Sparkles, Search,
 } from "lucide-react";
 
 // situação do licitante no resultado (estilo "análise dos licitantes")
@@ -132,6 +132,7 @@ export default function BidDetailPage() {
   const [loading, setLoading] = useState(true);
   const [tracking, setTracking] = useState(false);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [itemQuery, setItemQuery] = useState("");
   const [edQ, setEdQ] = useState("");
   const [edA, setEdA] = useState<{ answer: string; url?: string; titulo?: string } | null>(null);
   const [edLoading, setEdLoading] = useState(false);
@@ -454,7 +455,7 @@ export default function BidDetailPage() {
                 </button>
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {["Exige atestado de capacidade técnica?", "Qual o prazo de entrega/execução?", "Aceita ME/EPP?", "Qual a forma de pagamento?"].map(s => (
+                {["Resuma o edital: objeto, prazo, habilitação, atestado e garantia", "Exige atestado de capacidade técnica?", "Qual o prazo de entrega/execução?", "Aceita ME/EPP?", "Qual a forma de pagamento?"].map(s => (
                   <button key={s} onClick={() => askEdital(s)} disabled={edLoading}
                     className="text-[11px] text-slate-500 bg-slate-50 hover:bg-slate-100 border border-slate-100 px-2 py-1 rounded-full transition">
                     {s}
@@ -490,6 +491,9 @@ export default function BidDetailPage() {
               <span className="text-sm font-semibold">Tarefas do negócio</span>
               <span className="text-[11px] text-white/60 ml-1">prazos em dias úteis a partir da abertura</span>
               <span className="ml-auto text-[11px] text-white/70">{tasks.filter(t => t.done).length}/{tasks.length} feitas</span>
+            </div>
+            <div className="h-1 bg-slate-100">
+              <div className="h-full bg-emerald-500 transition-all" style={{ width: `${Math.round(100 * tasks.filter(t => t.done).length / tasks.length)}%` }} />
             </div>
             <div className="p-4 space-y-4">
               {["Preparação", "Disputa", "Pós-disputa"].map(sec => {
@@ -706,8 +710,19 @@ export default function BidDetailPage() {
         </div>
 
         {/* Itens / Lotes */}
-        {items.length > 0 && (
+        {items.length > 0 && (() => {
+          const q = itemQuery.trim().toLowerCase();
+          const shown = q ? items.filter((it: any) => (it.descricao || "").toLowerCase().includes(q)) : items;
+          const totalEst = shown.reduce((s: number, it: any) => s + (it.valor_total || 0), 0);
+          return (
           <Section title={`Itens / Lotes (${items.length})`} icon={Package}>
+            {items.length > 5 && (
+              <div className="relative mb-3">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input value={itemQuery} onChange={e => setItemQuery(e.target.value)} placeholder="Buscar item…"
+                  className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg w-full max-w-xs focus:outline-none focus:border-proc-300" />
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -720,7 +735,7 @@ export default function BidDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {items.map((item: any, i: number) => (
+                  {shown.map((item: any, i: number) => (
                     <tr key={i} className="hover:bg-slate-50 transition">
                       <td className="py-2.5 px-3 text-slate-500 text-xs whitespace-nowrap">
                         {item.numero ?? i + 1}
@@ -745,10 +760,22 @@ export default function BidDetailPage() {
                     </tr>
                   ))}
                 </tbody>
+                {totalEst > 0 && (
+                  <tfoot>
+                    <tr className="border-t-2 border-slate-100">
+                      <td colSpan={4} className="py-2.5 px-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        Total estimado{q ? " (filtrado)" : ""}
+                      </td>
+                      <td className="py-2.5 px-3 text-right whitespace-nowrap font-bold text-slate-900 text-sm">{fmt(totalEst)}</td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
+            {q && shown.length === 0 && <p className="text-xs text-slate-400 py-3 text-center">Nenhum item com “{itemQuery}”.</p>}
           </Section>
-        )}
+          );
+        })()}
 
         {/* Documentos */}
         {files.length > 0 && (

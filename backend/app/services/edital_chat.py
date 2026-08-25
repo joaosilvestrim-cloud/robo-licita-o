@@ -5,6 +5,8 @@ o texto e injeta um trecho no prompt do Groq junto com a pergunta. Funciona bem
 para editais de tamanho normal e não exige banco vetorial (protege o Render).
 """
 import io
+import re
+import unicodedata
 import logging
 import httpx
 from app.config import settings
@@ -12,8 +14,62 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 _MAX_PDF_BYTES = 9 * 1024 * 1024   # ignora PDFs gigantes
-_MAX_CHARS = 9000                  # trecho enviado ao modelo (limite de tokens do Groq free)
+_MAX_STORE = 120000                # texto total lido/guardado do edital
+_MAX_LLM = 9000                    # trecho enviado ao modelo (limite de tokens do Groq free)
 _UA = {"User-Agent": "Mozilla/5.0 (compatible; SonarBot/1.0)"}
+
+_STOP = {"de", "da", "do", "os", "as", "que", "qual", "quais", "para", "com", "em", "no", "na",
+         "um", "uma", "por", "the", "and", "ser", "sao", "este", "esta", "isso"}
+# sinônimos p/ ampliar a busca de trechos por tema
+_SYN = {
+    "atestado": ["atestado", "capacidade tecnica", "qualificacao tecnica", "comprovacao"],
+    "prazo": ["prazo", "entrega", "vigencia", "execucao", "cronograma"],
+    "garantia": ["garantia", "garantir", "assistencia"],
+    "pagamento": ["pagamento", "fatura", "nota fiscal", "medicao"],
+    "habilitacao": ["habilitacao", "documentacao", "regularidade"],
+    "penalidade": ["penalidade", "multa", "sancao"],
+}
+
+
+def _fold(s: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", (s or "").lower())
+                   if unicodedata.category(c) != "Mn")
+
+
+def retrieve(text: str, question: str, budget: int = _MAX_LLM) -> str:
+    """Seleciona os trechos do edital mais relevantes para a pergunta (mini-RAG
+    por sobreposição de termos). Para editais longos, evita mandar só o começo."""
+    if len(text) <= budget:
+        return text
+    fq = _fold(question)
+    terms = {t for t in re.findall(r"\w+", fq) if len(t) > 2 and t not in _STOP}
+    for key, syns in _SYN.items():
+        if key in fq or any(_fold(s) in fq for s in syns):
+            terms.update(_fold(s) for s in syns)
+    if not terms:
+        return text[:budget]
+
+    size, overlap = 1200, 200
+    chunks = [text[i:i + size] for i in range(0, len(text), size - overlap)]
+    scored = []
+    for idx, ch in enumerate(chunks):
+        f = _fold(ch)
+        score = sum(f.count(t) for t in terms)
+        if score:
+            scored.append((score, idx, ch))
+    if not scored:
+        return text[:budget]
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    picked, total = [], 0
+    for _score, idx, ch in scored:
+        if total + len(ch) > budget:
+            continue
+        picked.append((idx, ch))
+        total += len(ch)
+        if total >= budget:
+            break
+    picked.sort(key=lambda x: x[0])   # remonta na ordem do documento
+    return "\n[...]\n".join(ch for _idx, ch in picked)
 
 # palavras que indicam o documento principal (edital / termo de referência)
 _PREF = ("edital", "termo de refer", "aviso", "referência", "referencia")
@@ -54,7 +110,7 @@ async def extract_text(url: str) -> dict:
                 parts.append(page.extract_text() or "")
             except Exception:
                 continue
-            if sum(len(p) for p in parts) > _MAX_CHARS:
+            if sum(len(p) for p in parts) > _MAX_STORE:
                 break
         text = "\n".join(parts).strip()
     except Exception as e:
@@ -62,7 +118,7 @@ async def extract_text(url: str) -> dict:
         return {"ok": False, "reason": "erro_leitura", "text": ""}
     if not text:
         return {"ok": False, "reason": "sem_texto", "text": ""}
-    return {"ok": True, "text": text[:_MAX_CHARS]}
+    return {"ok": True, "text": text[:_MAX_STORE]}
 
 
 _SYS = (

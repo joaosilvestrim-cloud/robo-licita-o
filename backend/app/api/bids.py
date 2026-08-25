@@ -566,7 +566,7 @@ async def ask_edital_endpoint(
         return {"ok": False, "answer": "Faça uma pergunta sobre o edital."}
 
     from app.services.bid_items import get_files
-    from app.services.edital_chat import pick_edital_file, extract_text, ask_edital
+    from app.services.edital_chat import pick_edital_file, extract_text, retrieve, ask_edital
 
     # 1) arquivos (reusa o mesmo cache do endpoint /files)
     fk = f"files:{bid.external_id}"
@@ -592,8 +592,9 @@ async def ask_edital_endpoint(
         return {"ok": False, "answer": motivos.get(edital.get("reason"), "Não consegui ler o edital agora."),
                 "titulo": chosen.get("titulo"), "url": chosen.get("url")}
 
-    # 3) pergunta ao modelo
-    answer = await ask_edital(edital["text"], q)
+    # 3) seleciona os trechos relevantes (mini-RAG) e pergunta ao modelo
+    trecho = retrieve(edital["text"], q)
+    answer = await ask_edital(trecho, q)
     return {"ok": True, "answer": answer, "titulo": chosen.get("titulo"), "url": chosen.get("url")}
 
 
