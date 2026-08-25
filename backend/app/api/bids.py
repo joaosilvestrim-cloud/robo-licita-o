@@ -565,23 +565,36 @@ async def ask_edital_endpoint(
     if len(q) < 3:
         return {"ok": False, "answer": "Faça uma pergunta sobre o edital."}
 
-    from app.services.edital_chat import get_edital_text, ask_edital
+    from app.services.bid_items import get_files
+    from app.services.edital_chat import pick_edital_file, extract_text, ask_edital
+
+    # 1) arquivos (reusa o mesmo cache do endpoint /files)
+    fk = f"files:{bid.external_id}"
+    files_res = cache_get(fk)
+    if files_res is None:
+        files_res = await get_files(bid.external_id)
+        cache_set(fk, files_res, ttl=1800 if files_res.get("has_files") else 300)
+    chosen = pick_edital_file(files_res.get("files") or [])
+    if not chosen:
+        return {"ok": False, "answer": "Não achei o edital em PDF no PNCP para esta licitação."}
+
+    # 2) texto do edital (cache do texto extraído)
     tk = f"edital_txt:{bid.external_id}"
     edital = cache_get(tk)
     if edital is None:
-        edital = await get_edital_text(bid.external_id)
+        edital = await extract_text(chosen.get("url"))
         cache_set(tk, edital, ttl=3600 if edital.get("ok") else 300)
     if not edital.get("ok"):
         motivos = {
-            "sem_arquivo": "Não achei o edital em PDF no PNCP para esta licitação.",
             "sem_texto": "O edital parece ser um PDF escaneado (imagem), não consegui ler o texto.",
             "pdf_grande": "O edital é muito grande para ler automaticamente.",
         }
         return {"ok": False, "answer": motivos.get(edital.get("reason"), "Não consegui ler o edital agora."),
-                "titulo": edital.get("titulo"), "url": edital.get("url")}
+                "titulo": chosen.get("titulo"), "url": chosen.get("url")}
 
+    # 3) pergunta ao modelo
     answer = await ask_edital(edital["text"], q)
-    return {"ok": True, "answer": answer, "titulo": edital.get("titulo"), "url": edital.get("url")}
+    return {"ok": True, "answer": answer, "titulo": chosen.get("titulo"), "url": chosen.get("url")}
 
 
 def _split_csv(s):

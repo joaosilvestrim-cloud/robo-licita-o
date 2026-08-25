@@ -8,7 +8,6 @@ import io
 import logging
 import httpx
 from app.config import settings
-from app.services.bid_items import get_files
 
 logger = logging.getLogger(__name__)
 
@@ -17,42 +16,37 @@ _MAX_CHARS = 14000                 # trecho enviado ao modelo (limite de tokens 
 _UA = {"User-Agent": "Mozilla/5.0 (compatible; SonarBot/1.0)"}
 
 # palavras que indicam o documento principal (edital / termo de referência)
-_PREF = ("edital", "termo de refer", "termo de refer", "aviso", "referência")
+_PREF = ("edital", "termo de refer", "aviso", "referência", "referencia")
 
 
-def _pick_file(files: list[dict]) -> dict | None:
-    if not files:
+def pick_edital_file(files: list[dict]) -> dict | None:
+    """Escolhe o documento principal (edital/termo de referência) da lista."""
+    withurl = [f for f in (files or []) if f.get("url")]
+    if not withurl:
         return None
-    pdfs = [f for f in files if (f.get("url") and str(f.get("titulo", "")).lower().endswith(".pdf"))] or \
-           [f for f in files if f.get("url")]
-    for f in pdfs:
+    for f in withurl:
         t = (f.get("titulo") or "").lower()
         if any(p in t for p in _PREF):
             return f
-    return pdfs[0] if pdfs else None
+    return withurl[0]
 
 
-async def get_edital_text(external_id: str) -> dict:
-    """Baixa e extrai o texto do documento principal do edital."""
-    data = await get_files(external_id)
-    files = data.get("files") or []
-    chosen = _pick_file(files)
-    if not chosen:
-        return {"ok": False, "reason": "sem_arquivo", "text": "", "titulo": None}
-
+async def extract_text(url: str) -> dict:
+    """Baixa um PDF e extrai o texto (trecho limitado)."""
+    if not url:
+        return {"ok": False, "reason": "sem_url", "text": ""}
     try:
         from pypdf import PdfReader
     except Exception:
-        return {"ok": False, "reason": "sem_pypdf", "text": "", "titulo": chosen.get("titulo")}
-
+        return {"ok": False, "reason": "sem_pypdf", "text": ""}
     try:
         async with httpx.AsyncClient(timeout=25, verify=False, follow_redirects=True) as client:
-            resp = await client.get(chosen["url"], headers=_UA)
+            resp = await client.get(url, headers=_UA)
             if resp.status_code != 200:
-                return {"ok": False, "reason": f"http_{resp.status_code}", "text": "", "titulo": chosen.get("titulo")}
+                return {"ok": False, "reason": f"http_{resp.status_code}", "text": ""}
             content = resp.content
         if len(content) > _MAX_PDF_BYTES:
-            return {"ok": False, "reason": "pdf_grande", "text": "", "titulo": chosen.get("titulo")}
+            return {"ok": False, "reason": "pdf_grande", "text": ""}
         reader = PdfReader(io.BytesIO(content))
         parts = []
         for page in reader.pages:
@@ -64,13 +58,11 @@ async def get_edital_text(external_id: str) -> dict:
                 break
         text = "\n".join(parts).strip()
     except Exception as e:
-        logger.warning(f"get_edital_text erro {external_id}: {e}")
-        return {"ok": False, "reason": "erro_leitura", "text": "", "titulo": chosen.get("titulo")}
-
+        logger.warning(f"extract_text erro {url}: {e}")
+        return {"ok": False, "reason": "erro_leitura", "text": ""}
     if not text:
-        return {"ok": False, "reason": "sem_texto", "text": "", "titulo": chosen.get("titulo"),
-                "url": chosen.get("url")}
-    return {"ok": True, "text": text[:_MAX_CHARS], "titulo": chosen.get("titulo"), "url": chosen.get("url")}
+        return {"ok": False, "reason": "sem_texto", "text": ""}
+    return {"ok": True, "text": text[:_MAX_CHARS]}
 
 
 _SYS = (
@@ -99,8 +91,8 @@ async def ask_edital(text: str, question: str) -> str:
             )
             if resp.status_code != 200:
                 logger.warning(f"ask_edital groq {resp.status_code}: {resp.text[:300]}")
-                return f"[debug groq {resp.status_code}] {resp.text[:200]}"
+                return "Não consegui consultar o edital agora. Tente de novo em instantes."
             return resp.json()["choices"][0]["message"]["content"] or "Não consegui responder."
     except Exception as e:
         logger.warning(f"ask_edital groq erro: {e}")
-        return f"[debug erro] {type(e).__name__}: {str(e)[:200]}"
+        return "Não consegui consultar o edital agora. Tente de novo em instantes."
