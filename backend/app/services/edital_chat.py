@@ -12,7 +12,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 _MAX_PDF_BYTES = 9 * 1024 * 1024   # ignora PDFs gigantes
-_MAX_CHARS = 14000                 # trecho enviado ao modelo (limite de tokens do Groq free)
+_MAX_CHARS = 9000                  # trecho enviado ao modelo (limite de tokens do Groq free)
 _UA = {"User-Agent": "Mozilla/5.0 (compatible; SonarBot/1.0)"}
 
 # palavras que indicam o documento principal (edital / termo de referência)
@@ -91,8 +91,8 @@ async def ask_edital(text: str, question: str) -> str:
             )
             if resp.status_code != 200:
                 logger.warning(f"ask_edital groq {resp.status_code}: {resp.text[:300]}")
-                return "Não consegui consultar o edital agora. Tente de novo em instantes."
+                return f"[dbg2 {resp.status_code}] {resp.text[:200]}"
             return resp.json()["choices"][0]["message"]["content"] or "Não consegui responder."
     except Exception as e:
         logger.warning(f"ask_edital groq erro: {e}")
-        return "Não consegui consultar o edital agora. Tente de novo em instantes."
+        return f"[dbg2 exc] {type(e).__name__}: {str(e)[:180]}"
